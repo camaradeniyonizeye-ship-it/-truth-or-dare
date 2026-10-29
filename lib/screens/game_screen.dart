@@ -99,10 +99,13 @@ class _GameScreenState extends State<GameScreen> {
   void _completeQuestion() {
     AudioService.playClick();
     if (_selectedPlayer == null || _currentQuestion == null) return;
+    
+    // Fixed: added .toInt() to ensure score addition handles num-to-int correctly
     final updatedPlayer = _selectedPlayer!.copyWith(
-      score: _selectedPlayer!.score + _currentQuestion!.difficulty.levelValue * 10,
+      score: _selectedPlayer!.score + (_currentQuestion!.difficulty.levelValue * 10).toInt(),
       hasCompletedTurn: true,
     );
+    
     final updatedPlayers = [..._gameState.players];
     final idx = _gameState.players.indexWhere((p) => p.id == _selectedPlayer!.id);
     if (idx != -1) updatedPlayers[idx] = updatedPlayer;
