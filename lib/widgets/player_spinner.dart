@@ -68,7 +68,6 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
       });
     });
 
-    // Fixed: using addStatusListener instead of statusListener setter
     animation.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         setState(() {
@@ -92,7 +91,6 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
         Stack(
           alignment: Alignment.center,
           children: [
-            // The Spinning Wheel
             Transform.rotate(
               angle: _angle,
               child: CustomPaint(
@@ -100,7 +98,6 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
                 painter: _WheelPainter(players: widget.players),
               ),
             ),
-            // Pointer at the top (placed after wheel so it renders on top without zIndex)
             Positioned(
               top: 0,
               child: CustomPaint(
@@ -108,7 +105,6 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
                 painter: _TrianglePainter(),
               ),
             ),
-            // Center spin button hub
             GestureDetector(
               onTap: () => _spinWheel(activePool),
               child: Container(
@@ -230,4 +226,7 @@ class _TrianglePainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
