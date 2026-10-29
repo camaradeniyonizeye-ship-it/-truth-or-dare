@@ -136,7 +136,10 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => DifficultySelectionScreen(players: _players),
+                            builder: (_) => DifficultySelectionScreen(
+                              players: _players,
+                              selectedLanguage: widget.language,
+                            ),
                           ),
                         );
                       },
