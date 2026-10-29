@@ -28,11 +28,16 @@ jobs:
       - name: Re-generate Android platform files
         run: flutter create . --project-name truth_or_dare --platforms=android --org com.truthordare.app
 
+      - name: Downgrade compileSdkVersion in build.gradle to 34
+        run: |
+          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' android/app/build.gradle
+          sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/g' android/app/build.gradle
+
       - name: Get Flutter Dependencies
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
