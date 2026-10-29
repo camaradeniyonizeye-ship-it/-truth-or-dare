@@ -49,6 +49,7 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
     final selectedIndex = widget.players.indexOf(selectedPlayer);
 
     final double sliceAngle = (2 * math.pi) / widget.players.length;
+    // Calculate precise target angle so the pointer lands exactly on the player's slice
     final double targetAngle = (2 * math.pi * 5) + (2 * math.pi - (selectedIndex * sliceAngle) - (sliceAngle / 2));
 
     _controller.reset();
