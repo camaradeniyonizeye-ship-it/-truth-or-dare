@@ -100,9 +100,9 @@ class _GameScreenState extends State<GameScreen> {
     AudioService.playClick();
     if (_selectedPlayer == null || _currentQuestion == null) return;
     
-    // Fixed: added .toInt() to ensure score addition handles num-to-int correctly
+    // Fixed: using a clean fixed score addition of 10 points per turn
     final updatedPlayer = _selectedPlayer!.copyWith(
-      score: _selectedPlayer!.score + (_currentQuestion!.difficulty.levelValue * 10).toInt(),
+      score: _selectedPlayer!.score + 10,
       hasCompletedTurn: true,
     );
     
