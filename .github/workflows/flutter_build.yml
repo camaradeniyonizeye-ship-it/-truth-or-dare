@@ -28,7 +28,7 @@ jobs:
       - name: Re-generate Android platform files
         run: flutter create . --project-name truth_or_dare --platforms=android --org com.truthordare.app
 
-      - name: Downgrade compileSdkVersion in build.gradle to 34
+      - name: Set compileSdkVersion to 34 in build.gradle
         run: |
           sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' android/app/build.gradle
           sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/g' android/app/build.gradle
