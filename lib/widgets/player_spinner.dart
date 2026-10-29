@@ -44,14 +44,11 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
       _isSpinning = true;
     });
 
-    // Pick a random player from the eligible pool (who haven't played yet this cycle)
     final random = math.Random();
     final selectedPlayer = availablePlayers[random.nextInt(availablePlayers.length)];
     final selectedIndex = widget.players.indexOf(selectedPlayer);
 
-    // Calculate slice angle and target rotation
     final double sliceAngle = (2 * math.pi) / widget.players.length;
-    // Target position so the selected player lands under the top pointer
     final double targetAngle = (2 * math.pi * 5) + (2 * math.pi - (selectedIndex * sliceAngle) - (sliceAngle / 2));
 
     _controller.reset();
@@ -71,23 +68,22 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
       });
     });
 
-    animation.statusListener = (status) {
+    // Fixed: using addStatusListener instead of statusListener setter
+    animation.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         setState(() {
           _isSpinning = false;
         });
         widget.onPlayerSelected(selectedPlayer);
       }
-    };
+    });
 
     _controller.forward();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Filter players who have NOT completed their turn in this round
     final availablePlayers = widget.players.where((p) => !p.hasCompletedTurn).toList();
-    // If everyone has played, reset the cycle automatically
     final activePool = availablePlayers.isNotEmpty ? availablePlayers : widget.players;
 
     return Column(
@@ -96,21 +92,20 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
         Stack(
           alignment: Alignment.center,
           children: [
-            // Pointer at the top
-            Positioned(
-              top: 0,
-              zIndex: 10,
-              child: CustomPaint(
-                size: const Size(30, 30),
-                painter: _TrianglePainter(),
-              ),
-            ),
             // The Spinning Wheel
             Transform.rotate(
               angle: _angle,
               child: CustomPaint(
                 size: const Size(280, 280),
                 painter: _WheelPainter(players: widget.players),
+              ),
+            ),
+            // Pointer at the top (placed after wheel so it renders on top without zIndex)
+            Positioned(
+              top: 0,
+              child: CustomPaint(
+                size: const Size(30, 30),
+                painter: _TrianglePainter(),
               ),
             ),
             // Center spin button hub
@@ -194,7 +189,6 @@ class _WheelPainter extends CustomPainter {
 
       canvas.drawArc(rect, i * sliceAngle, sliceAngle, true, paint);
 
-      // Draw Player Names
       canvas.save();
       canvas.translate(center.dx, center.dy);
       canvas.rotate(i * sliceAngle + sliceAngle / 2);
