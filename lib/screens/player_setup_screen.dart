@@ -110,7 +110,7 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
                   itemBuilder: (context, index) {
                     final p = _players[index];
                     return Card(
-                      color: Colors.white.withOpacity(0.06), // Fixed useAlpha error
+                      color: Colors.white.withOpacity(0.06),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       child: ListTile(
                         leading: CircleAvatar(
@@ -135,7 +135,9 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
                     : () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => DifficultySelectionScreen(players: _players, language: widget.language)),
+                          MaterialPageRoute(
+                            builder: (_) => DifficultySelectionScreen(players: _players),
+                          ),
                         );
                       },
                 style: ElevatedButton.styleFrom(
