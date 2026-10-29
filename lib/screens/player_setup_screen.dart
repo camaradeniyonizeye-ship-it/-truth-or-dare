@@ -110,7 +110,7 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
                   itemBuilder: (context, index) {
                     final p = _players[index];
                     return Card(
-                      color: Colors.white.useAlpha ? Colors.white.withOpacity(0.06) : const Color(0x10FFFFFF),
+                      color: Colors.white.withOpacity(0.06), // Fixed useAlpha error
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       child: ListTile(
                         leading: CircleAvatar(
@@ -118,7 +118,7 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
                           child: Text(p.name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                         ),
                         title: Text(p.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                        subtitle: Text(p.gender, style: TextStyle(color: Colors.white60)),
+                        subtitle: Text(p.gender, style: const TextStyle(color: Colors.white60)),
                         trailing: IconButton(
                           icon: const Icon(Icons.delete, color: Colors.redAccent),
                           onPressed: () => setState(() => _players.removeAt(index)),
