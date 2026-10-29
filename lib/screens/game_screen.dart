@@ -29,6 +29,9 @@ class _GameScreenState extends State<GameScreen> {
   bool _showQuestion = false;
   Question? _currentQuestion;
 
+  // Track the last chosen type per player ID to prevent back-to-back Truth turns
+  final Map<String, String> _lastChosenTypePerPlayer = {};
+
   @override
   void initState() {
     super.initState();
@@ -48,10 +51,24 @@ class _GameScreenState extends State<GameScreen> {
       _selectedPlayer = player;
       _showPlayerSpinner = false;
       _showTypeSelector = true;
+      _selectedType = ''; // Reset type choice for new turn
     });
   }
 
   void _selectType(String type) {
+    if (_selectedPlayer != null &&
+        type.toLowerCase() == 'truth' &&
+        _lastChosenTypePerPlayer[_selectedPlayer!.id] == 'truth') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You chose Truth last turn! You must take a DARE this time!'),
+          backgroundColor: Color(0xFFFF0080),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     AudioService.playClick();
     setState(() => _selectedType = type);
   }
@@ -59,10 +76,14 @@ class _GameScreenState extends State<GameScreen> {
   void _startQuestion() {
     if (_selectedType.isEmpty || _selectedPlayer == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select Truth or Dare!'), backgroundColor: Color(0xFFFF0000)),
+        const SnackBar(
+          content: Text('Please select Truth or Dare!'),
+          backgroundColor: Color(0xFFFF0000),
+        ),
       );
       return;
     }
+
     final available = _gameState.questions
         .where((q) => q.type == _selectedType && !_gameState.usedQuestions.contains(q))
         .toList();
@@ -73,7 +94,10 @@ class _GameScreenState extends State<GameScreen> {
 
     if (pool.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No questions available!'), backgroundColor: Color(0xFFFF0000)),
+        const SnackBar(
+          content: Text('No questions available for this category!'),
+          backgroundColor: Color(0xFFFF0000),
+        ),
       );
       return;
     }
@@ -81,6 +105,9 @@ class _GameScreenState extends State<GameScreen> {
     final selected = pool[DateTime.now().millisecondsSinceEpoch % pool.length];
     final processedText = QuestionLoader.processQuestionText(
         selected.text, _selectedPlayer, widget.players);
+
+    // Save this choice as the last chosen type for this player
+    _lastChosenTypePerPlayer[_selectedPlayer!.id] = _selectedType.toLowerCase();
 
     setState(() {
       _currentQuestion = selected.copyWith(text: processedText);
@@ -99,13 +126,12 @@ class _GameScreenState extends State<GameScreen> {
   void _completeQuestion() {
     AudioService.playClick();
     if (_selectedPlayer == null || _currentQuestion == null) return;
-    
-    // Fixed: using a clean fixed score addition of 10 points per turn
+
     final updatedPlayer = _selectedPlayer!.copyWith(
       score: _selectedPlayer!.score + 10,
       hasCompletedTurn: true,
     );
-    
+
     final updatedPlayers = [..._gameState.players];
     final idx = _gameState.players.indexWhere((p) => p.id == _selectedPlayer!.id);
     if (idx != -1) updatedPlayers[idx] = updatedPlayer;
@@ -167,11 +193,19 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isTruthDisabled = _selectedPlayer != null &&
+        _lastChosenTypePerPlayer[_selectedPlayer!.id] == 'truth';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_selectedPlayer != null
-            ? "${_selectedPlayer!.name}'s Turn"
-            : 'TRUTH OR DARE'),
+        title: Text(
+          _selectedPlayer != null
+              ? "${_selectedPlayer!.name}'s Turn"
+              : 'TRUTH OR DARE',
+          style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.leaderboard, color: Color(0xFFFFD700)),
@@ -183,110 +217,155 @@ class _GameScreenState extends State<GameScreen> {
           )
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_showPlayerSpinner)
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('SELECT A PLAYER',
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF1a0033), Color(0xFF330033), Color(0xFF000000)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_showPlayerSpinner)
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'SPIN THE WHEEL',
                         style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
-                    PlayerSpinner(
-                      players: _gameState.players,
-                      onPlayerSelected: _onPlayerSelected,
-                    ),
-                  ],
-                ),
-              ),
-            if (_showTypeSelector)
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "${_selectedPlayer?.name}'s Turn",
-                      style: TextStyle(
-                        color: _getGenderColor(_selectedPlayer?.gender ?? 'Other'),
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.black,
+                          letterSpacing: 1.5,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 30),
-                    const Text('Choose:',
-                        style: TextStyle(color: Colors.white, fontSize: 18)),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildButton('Truth', const Color(0xFF0080FF)),
-                        const SizedBox(width: 20),
-                        _buildButton('Dare', const Color(0xFFFF0080)),
-                      ],
-                    ),
-                    const SizedBox(height: 30),
-                    ElevatedButton(
-                      onPressed: _startQuestion,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _selectedType.isNotEmpty
-                            ? (_selectedType == 'truth'
-                                ? const Color(0xFF0080FF)
-                                : const Color(0xFFFF0080))
-                            : Colors.grey,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 40, vertical: 16),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Who takes the next challenge?',
+                        style: TextStyle(color: Colors.white70, fontSize: 16),
                       ),
-                      child: const Text('CONTINUE',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
-                    )
-                  ],
+                      const SizedBox(height: 25),
+                      PlayerSpinner(
+                        players: _gameState.players,
+                        onPlayerSelected: _onPlayerSelected,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            if (_showQuestion && _currentQuestion != null && _selectedPlayer != null)
-              Expanded(
-                child: _currentQuestion!.type == 'truth'
-                    ? TruthCard(
-                        question: _currentQuestion!,
-                        player: _selectedPlayer!,
-                        onComplete: _completeQuestion,
+              if (_showTypeSelector)
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "${_selectedPlayer?.name}'s Turn",
+                        style: TextStyle(
+                          color: _getGenderColor(_selectedPlayer?.gender ?? 'Other'),
+                          fontSize: 32,
+                          fontWeight: FontWeight.black,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      if (isTruthDisabled)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          margin: const EdgeInsets.symmetric(horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.pinkAccent.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.pinkAccent),
+                          ),
+                          child: const Text(
+                            '⚠️ TRUTH locked! You picked Truth last turn.',
+                            style: TextStyle(
+                              color: Colors.pinkAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 30),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildChoiceButton('Truth', const Color(0xFF0080FF), isTruthDisabled),
+                          const SizedBox(width: 20),
+                          _buildChoiceButton('Dare', const Color(0xFFFF0080), false),
+                        ],
+                      ),
+                      const SizedBox(height: 40),
+                      ElevatedButton(
+                        onPressed: _startQuestion,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _selectedType.isNotEmpty
+                              ? (_selectedType == 'truth'
+                                  ? const Color(0xFF0080FF)
+                                  : const Color(0xFFFF0080))
+                              : Colors.grey,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                        ),
+                        child: const Text(
+                          'CONTINUE',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                        ),
                       )
-                    : DareCard(
-                        question: _currentQuestion!,
-                        player: _selectedPlayer!,
-                        onComplete: _completeQuestion,
-                      ),
-              ),
-          ],
+                    ],
+                  ),
+                ),
+              if (_showQuestion && _currentQuestion != null && _selectedPlayer != null)
+                Expanded(
+                  child: _currentQuestion!.type == 'truth'
+                      ? TruthCard(
+                          question: _currentQuestion!,
+                          player: _selectedPlayer!,
+                          onComplete: _completeQuestion,
+                        )
+                      : DareCard(
+                          question: _currentQuestion!,
+                          player: _selectedPlayer!,
+                          onComplete: _completeQuestion,
+                        ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildButton(String type, Color color) {
+  Widget _buildChoiceButton(String type, Color color, bool isDisabled) {
     final selected = _selectedType == type.toLowerCase();
+    final activeColor = isDisabled ? Colors.grey : color;
+
     return GestureDetector(
-      onTap: () => _selectType(type.toLowerCase()),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 14),
-        decoration: BoxDecoration(
-          color: selected ? color : Colors.transparent,
-          border: Border.all(color: selected ? Colors.white : color, width: 2),
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Text(
-          type,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: selected ? Colors.black : color,
+      onTap: isDisabled ? () => _selectType(type.toLowerCase()) : () => _selectType(type.toLowerCase()),
+      child: Opacity(
+        opacity: isDisabled ? 0.4 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+          decoration: BoxDecoration(
+            color: selected ? activeColor : Colors.transparent,
+            border: Border.all(color: selected ? Colors.white : activeColor, width: 2.5),
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: selected
+                ? [BoxShadow(color: activeColor.withOpacity(0.5), blurRadius: 10, spreadRadius: 1)]
+                : [],
+          ),
+          child: Text(
+            type.toUpperCase(),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+              color: selected ? Colors.black : activeColor,
+            ),
           ),
         ),
       ),
