@@ -237,7 +237,7 @@ class _GameScreenState extends State<GameScreen> {
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 26,
-                          fontWeight: FontWeight.w900, // Fixed FontWeight.black error
+                          fontWeight: FontWeight.w900,
                           letterSpacing: 1.5,
                         ),
                       ),
@@ -264,7 +264,7 @@ class _GameScreenState extends State<GameScreen> {
                         style: TextStyle(
                           color: _getGenderColor(_selectedPlayer?.gender ?? 'Other'),
                           fontSize: 32,
-                          fontWeight: FontWeight.w900, // Fixed FontWeight.black error
+                          fontWeight: FontWeight.w900,
                           letterSpacing: 1.2,
                         ),
                       ),
