@@ -29,7 +29,6 @@ class _GameScreenState extends State<GameScreen> {
   bool _showQuestion = false;
   Question? _currentQuestion;
 
-  // Track the last chosen type per player ID to prevent back-to-back Truth turns
   final Map<String, String> _lastChosenTypePerPlayer = {};
 
   @override
@@ -51,7 +50,7 @@ class _GameScreenState extends State<GameScreen> {
       _selectedPlayer = player;
       _showPlayerSpinner = false;
       _showTypeSelector = true;
-      _selectedType = ''; // Reset type choice for new turn
+      _selectedType = '';
     });
   }
 
@@ -106,7 +105,6 @@ class _GameScreenState extends State<GameScreen> {
     final processedText = QuestionLoader.processQuestionText(
         selected.text, _selectedPlayer, widget.players);
 
-    // Save this choice as the last chosen type for this player
     _lastChosenTypePerPlayer[_selectedPlayer!.id] = _selectedType.toLowerCase();
 
     setState(() {
@@ -239,7 +237,7 @@ class _GameScreenState extends State<GameScreen> {
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 26,
-                          fontWeight: FontWeight.black,
+                          fontWeight: FontWeight.w900, // Fixed FontWeight.black error
                           letterSpacing: 1.5,
                         ),
                       ),
@@ -266,7 +264,7 @@ class _GameScreenState extends State<GameScreen> {
                         style: TextStyle(
                           color: _getGenderColor(_selectedPlayer?.gender ?? 'Other'),
                           fontSize: 32,
-                          fontWeight: FontWeight.black,
+                          fontWeight: FontWeight.w900, // Fixed FontWeight.black error
                           letterSpacing: 1.2,
                         ),
                       ),
@@ -345,7 +343,7 @@ class _GameScreenState extends State<GameScreen> {
     final activeColor = isDisabled ? Colors.grey : color;
 
     return GestureDetector(
-      onTap: isDisabled ? () => _selectType(type.toLowerCase()) : () => _selectType(type.toLowerCase()),
+      onTap: () => _selectType(type.toLowerCase()),
       child: Opacity(
         opacity: isDisabled ? 0.4 : 1.0,
         child: Container(
