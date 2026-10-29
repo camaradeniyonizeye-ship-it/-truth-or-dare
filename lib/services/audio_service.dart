@@ -2,44 +2,63 @@ import 'package:audioplayers/audioplayers.dart';
 
 class AudioService {
   static final AudioPlayer _bgPlayer = AudioPlayer();
-  static final AudioPlayer _clickPlayer = AudioPlayer();
   static final AudioPlayer _sfxPlayer = AudioPlayer();
+  static bool _isBgPlaying = false;
 
   static Future<void> playBackground() async {
-    await _bgPlayer.setReleaseMode(ReleaseMode.loop);
-    await _bgPlayer.setVolume(0.25);
-    await _bgPlayer.play(AssetSource('background_music.mp3'));
+    if (_isBgPlaying) return;
+    try {
+      await _bgPlayer.setReleaseMode(ReleaseMode.loop);
+      await _bgPlayer.setVolume(0.3);
+      await _bgPlayer.play(AssetSource('background_music.mp3'));
+      _isBgPlaying = true;
+    } catch (_) {}
   }
 
   static Future<void> playClick() async {
-    // Ensure the click sound is strictly configured for a single one-shot tap
-    await _clickPlayer.setReleaseMode(ReleaseMode.stop);
-    await _clickPlayer.setVolume(0.8);
-    await _clickPlayer.stop(); // Stop any overlapping click audio before replaying
-    await _clickPlayer.play(AssetSource('click.mp3'));
+    try {
+      await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
+      await _sfxPlayer.setVolume(1.0);
+      await _sfxPlayer.play(AssetSource('click.mp3'));
+    } catch (_) {}
   }
 
   static Future<void> playWheelSpin() async {
-    await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
-    await _sfxPlayer.setVolume(0.8);
-    await _sfxPlayer.play(AssetSource('card_flip.wav'));
+    try {
+      await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
+      await _sfxPlayer.setVolume(1.0);
+      await _sfxPlayer.play(AssetSource('card_flip.wav'));
+    } catch (_) {}
   }
 
   static Future<void> playCardFlip() async {
-    await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
-    await _sfxPlayer.setVolume(0.8);
-    await _sfxPlayer.play(AssetSource('card_flip.wav'));
+    try {
+      await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
+      await _sfxPlayer.setVolume(1.0);
+      await _sfxPlayer.play(AssetSource('card_flip.wav'));
+    } catch (_) {}
   }
 
   static Future<void> playWinner() async {
-    await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
-    await _sfxPlayer.setVolume(1.0);
-    await _sfxPlayer.play(AssetSource('winner.wav'));
+    try {
+      await _bgPlayer.stop(); // Stop background for winner sound
+      _isBgPlaying = false;
+      await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
+      await _sfxPlayer.setVolume(1.0);
+      await _sfxPlayer.play(AssetSource('winner.wav'));
+      
+      // Resume background music after winner celebration
+      Future.delayed(const Duration(seconds: 4), () {
+        playBackground();
+      });
+    } catch (_) {}
   }
 
   static Future<void> stopAll() async {
-    await _bgPlayer.stop();
-    await _clickPlayer.stop();
-    await _sfxPlayer.stop();
+    try {
+      await _bgPlayer.stop();
+      await _sfxPlayer.stop();
+      _isBgPlaying = false;
+    } catch (_) {}
   }
 }
