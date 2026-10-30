@@ -7,31 +7,38 @@ class QuestionLoader {
   static Future<List<Question>> loadQuestions(String language, {String category = 'Vanilla'}) async {
     try {
       final String jsonString = await rootBundle.loadString('assets/data/locales/$language.json');
-      final Map<String, dynamic> jsonData = json.decode(jsonString);
+      final dynamic decoded = json.decode(jsonString);
 
       List<Question> questions = [];
-      String targetCategory = category.trim().toLowerCase();
-      String? matchedKey;
 
-      jsonData.forEach((key, value) {
-        if (key.trim().toLowerCase() == targetCategory) {
-          matchedKey = key;
-        }
-      });
+      if (decoded is Map<String, dynamic>) {
+        String targetCategory = category.trim().toLowerCase();
+        String? matchedKey;
 
-      if (matchedKey != null && jsonData[matchedKey] is List) {
-        final categoryData = jsonData[matchedKey] as List<dynamic>;
-        for (var item in categoryData) {
-          questions.add(Question.fromJson(item));
-        }
-      } else {
-        jsonData.forEach((key, value) {
-          if (value is List) {
-            for (var item in value) {
-              questions.add(Question.fromJson(item));
-            }
+        decoded.forEach((key, value) {
+          if (key.trim().toLowerCase() == targetCategory) {
+            matchedKey = key;
           }
         });
+
+        if (matchedKey != null && decoded[matchedKey] is List) {
+          final categoryData = decoded[matchedKey] as List<dynamic>;
+          for (var item in categoryData) {
+            questions.add(Question.fromJson(item));
+          }
+        } else {
+          decoded.forEach((key, value) {
+            if (value is List) {
+              for (var item in value) {
+                questions.add(Question.fromJson(item));
+              }
+            }
+          });
+        }
+      } else if (decoded is List) {
+        for (var item in decoded) {
+          questions.add(Question.fromJson(item));
+        }
       }
 
       if (questions.isNotEmpty) return questions;
@@ -39,7 +46,6 @@ class QuestionLoader {
       print("JSON asset load error for $language: $e");
     }
 
-    // Fallback default questions so the game never runs empty
     return _getFallbackQuestions(category);
   }
 
