@@ -1,29 +1,36 @@
-import 'difficulty_level.dart';
-
 class Question {
   final String id;
-  final String type;
   final String text;
-  final DifficultyLevel difficulty;
+  final String type; // 'truth' or 'dare'
+  final String category; // 'Vanilla', 'Playful', 'Wild', 'Extreme', 'Couple'
 
   Question({
     required this.id,
-    required this.type,
     required this.text,
-    this.difficulty = DifficultyLevel.playful,
+    required this.type,
+    required this.category,
   });
+
+  factory Question.fromJson(Map<String, dynamic> json) {
+    return Question(
+      id: json['id']?.toString() ?? '',
+      text: json['text']?.toString() ?? '',
+      type: json['type']?.toString().toLowerCase() ?? 'truth',
+      category: json['category']?.toString() ?? 'Vanilla',
+    );
+  }
 
   Question copyWith({
     String? id,
-    String? type,
     String? text,
-    DifficultyLevel? difficulty,
+    String? type,
+    String? category,
   }) {
     return Question(
       id: id ?? this.id,
-      type: type ?? this.type,
       text: text ?? this.text,
-      difficulty: difficulty ?? this.difficulty,
+      type: type ?? this.type,
+      category: category ?? this.category,
     );
   }
 }
