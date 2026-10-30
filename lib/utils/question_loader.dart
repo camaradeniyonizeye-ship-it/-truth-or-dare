@@ -6,6 +6,7 @@ import '../models/player.dart';
 class QuestionLoader {
   static Future<List<Question>> loadQuestions(String language, {String category = 'Vanilla'}) async {
     try {
+      // Strictly lowercase to match repository filenames on Linux/GitHub Actions (english.json, french.json, etc.)
       final String filename = language.toLowerCase();
       final String jsonString = await rootBundle.loadString('assets/data/locales/$filename.json');
       final dynamic decoded = json.decode(jsonString);
@@ -70,12 +71,12 @@ class QuestionLoader {
 
     // 2. Strict Partnering / Target Substitution Logic
     if (processed.contains('{target}') || processed.contains('{partner}')) {
-      // Find all other players excluding the current player
       final otherPlayers = allPlayers.where((p) => p.id != currentPlayer.id).toList();
 
       if (otherPlayers.isNotEmpty) {
-        // Strictly prioritize opposite gender
         final currentPlayerGender = currentPlayer.gender.trim().toLowerCase();
+        
+        // Strictly prioritize opposite gender
         final oppositeGenderTargets = otherPlayers.where((p) {
           final pGender = p.gender.trim().toLowerCase();
           return pGender != currentPlayerGender && (pGender == 'male' || pGender == 'female');
@@ -91,7 +92,6 @@ class QuestionLoader {
             .replaceAll('{target}', target.name)
             .replaceAll('{partner}', target.name);
       } else {
-        // Absolute fallback if playing solo or list is empty
         processed = processed
             .replaceAll('{target}', 'someone')
             .replaceAll('{partner}', 'someone');
