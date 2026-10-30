@@ -9,17 +9,19 @@ class AudioService {
     if (_isBgPlaying) return;
     try {
       await _bgPlayer.setReleaseMode(ReleaseMode.loop);
-      await _bgPlayer.setVolume(0.3);
-      await _bgPlayer.play(AssetSource('background_music.mp3'));
+      await _bgPlayer.setVolume(0.3); // 30% comfortable background volume
+      await _bgPlayer.play(AssetSource('music/background_music.mp3'));
       _isBgPlaying = true;
-    } catch (_) {}
+    } catch (e) {
+      print("Audio background error: $e");
+    }
   }
 
   static Future<void> playClick() async {
     try {
       await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
       await _sfxPlayer.setVolume(1.0);
-      await _sfxPlayer.play(AssetSource('click.mp3'));
+      await _sfxPlayer.play(AssetSource('music/click.mp3'));
     } catch (_) {}
   }
 
@@ -27,27 +29,18 @@ class AudioService {
     try {
       await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
       await _sfxPlayer.setVolume(1.0);
-      await _sfxPlayer.play(AssetSource('card_flip.wav'));
-    } catch (_) {}
-  }
-
-  static Future<void> playCardFlip() async {
-    try {
-      await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
-      await _sfxPlayer.setVolume(1.0);
-      await _sfxPlayer.play(AssetSource('card_flip.wav'));
+      await _sfxPlayer.play(AssetSource('music/card_flip.wav'));
     } catch (_) {}
   }
 
   static Future<void> playWinner() async {
     try {
-      await _bgPlayer.stop(); // Stop background for winner sound
+      await _bgPlayer.stop();
       _isBgPlaying = false;
       await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
       await _sfxPlayer.setVolume(1.0);
-      await _sfxPlayer.play(AssetSource('winner.wav'));
+      await _sfxPlayer.play(AssetSource('music/winner.wav'));
       
-      // Resume background music after winner celebration
       Future.delayed(const Duration(seconds: 4), () {
         playBackground();
       });
