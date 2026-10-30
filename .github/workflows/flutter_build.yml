@@ -28,9 +28,12 @@ jobs:
       - name: Re-generate Android platform files
         run: flutter create . --project-name truth_or_dare --platforms=android --org com.truthordare.app
 
-      - name: Set App Name in AndroidManifest.xml
+      - name: Set App Name in strings.xml
         run: |
-          sed -i 's/android:label="truth_or_dare"/android:label="TRUTH OR DARE 18+"\n    android:icon="@mipmap\/launcher_icon"\n    android:roundIcon="@mipmap\/launcher_icon"/g' android/app/src/main/AndroidManifest.xml || true
+          STRING_FILE="android/app/src/main/res/values/strings.xml"
+          if [ -f "$STRING_FILE" ]; then
+            sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">TRUTH OR DARE 18+<\/string>/g' "$STRING_FILE"
+          fi
 
       - name: Set compileSdkVersion to 34 in build.gradle
         run: |
