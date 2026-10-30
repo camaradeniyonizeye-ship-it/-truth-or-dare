@@ -11,7 +11,6 @@ class Question {
     required this.category,
   });
 
-  // Getter so any code calling q.difficulty gets the category seamlessly
   String get difficulty => category;
 
   factory Question.fromJson(Map<String, dynamic> json) {
