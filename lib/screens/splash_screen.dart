@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/audio_service.dart';
 import 'player_setup_screen.dart';
-import 'difficulty_selection_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -25,20 +24,8 @@ class _SplashScreenState extends State<SplashScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => PlayerSetupScreen(
+        builder: (context) => const PlayerSetupScreen(
           language: 'English',
-          onPlayersReady: (players) {
-            AudioService.playClick();
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DifficultySelectionScreen(
-                  players: players,
-                  selectedLanguage: 'English',
-                ),
-              ),
-            );
-          },
         ),
       ),
     );
@@ -49,30 +36,14 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1a0033), Color(0xFF000000)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+          image: DecorationImage(
+            image: AssetImage('assets/images/splash.jpg'),
+            fit: BoxFit.cover,
           ),
         ),
         child: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'TRUTH OR DARE 18+',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-              SizedBox(height: 20),
-              CircularProgressIndicator(
-                color: Colors.pinkAccent,
-              ),
-            ],
+          child: CircularProgressIndicator(
+            color: Colors.pinkAccent,
           ),
         ),
       ),
