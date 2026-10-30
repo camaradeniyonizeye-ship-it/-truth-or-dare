@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/player.dart';
+import 'difficulty_selection_screen.dart';
+import '../services/audio_service.dart';
 
 class PlayerSetupScreen extends StatefulWidget {
   final String? language;
-  final Function(List<Player>) onPlayersReady;
 
   const PlayerSetupScreen({
     super.key,
     this.language,
-    required this.onPlayersReady,
   });
 
   @override
@@ -42,13 +42,13 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
     await prefs.setStringList('frequent_players', names);
   }
 
-  void _addPlayer(String name) {
+  void _addPlayer(String name, {String gender = 'Male'}) {
     if (name.trim().isEmpty) return;
     setState(() {
       _players.add(Player(
         id: DateTime.now().millisecondsSinceEpoch.toString() + name,
         name: name.trim(),
-        gender: _selectedGender,
+        gender: gender,
       ));
       _nameController.clear();
     });
@@ -107,12 +107,23 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
             ),
             const SizedBox(height: 10),
             ElevatedButton(
-              onPressed: () => _addPlayer(_nameController.text),
+              onPressed: () => _addPlayer(_nameController.text, gender: _selectedGender),
               child: const Text('Add Player'),
             ),
+            if (_frequentNames.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              const Text('Frequent Players:', style: TextStyle(color: Colors.white70)),
+              Wrap(
+                spacing: 8,
+                children: _frequentNames.map((name) => ActionChip(
+                  label: Text(name),
+                  onPressed: () => _addPlayer(name, gender: 'Male'),
+                )).toList(),
+              ),
+            ],
             const SizedBox(height: 20),
             const Text(
-              'Players List (Scrollable):',
+              'Players List:',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
@@ -139,7 +150,18 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.pinkAccent),
               onPressed: _players.length >= 2
-                  ? () => widget.onPlayersReady(_players)
+                  ? () {
+                      AudioService.playClick();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DifficultySelectionScreen(
+                            players: _players,
+                            selectedLanguage: widget.language ?? 'English',
+                          ),
+                        ),
+                      );
+                    }
                   : null,
               child: const Text('Start Game', style: TextStyle(fontSize: 18, color: Colors.white)),
             ),
