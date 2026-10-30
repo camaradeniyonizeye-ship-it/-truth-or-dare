@@ -49,11 +49,10 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
     final selectedIndex = widget.players.indexOf(selectedPlayer);
 
     final double sliceAngle = (2 * math.pi) / widget.players.length;
-    // Calculate precise target angle so the pointer lands exactly on the player's slice
-    final double targetAngle = (2 * math.pi * 5) + (2 * math.pi - (selectedIndex * sliceAngle) - (sliceAngle / 2));
+    final double sliceCenter = (selectedIndex * sliceAngle) + (sliceAngle / 2);
+    final double targetAngle = (2 * math.pi * 6) + (2 * math.pi - sliceCenter);
 
     _controller.reset();
-    _controller.duration = const Duration(seconds: 3);
 
     Animation<double> animation = Tween<double>(
       begin: _angle,
@@ -131,7 +130,6 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      letterSpacing: 1.2,
                     ),
                   ),
                 ),
@@ -147,11 +145,10 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-            elevation: 5,
           ),
           child: Text(
             _isSpinning ? 'SPINNING...' : 'SPIN THE WHEEL',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
       ],
