@@ -9,7 +9,7 @@ class AudioService {
     if (_isBgPlaying) return;
     try {
       await _bgPlayer.setReleaseMode(ReleaseMode.loop);
-      await _bgPlayer.setVolume(0.3); // 30% comfortable background volume
+      await _bgPlayer.setVolume(0.3); // 30% soft background volume
       await _bgPlayer.play(AssetSource('music/background_music.mp3'));
       _isBgPlaying = true;
     } catch (e) {
@@ -26,6 +26,14 @@ class AudioService {
   }
 
   static Future<void> playWheelSpin() async {
+    try {
+      await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
+      await _sfxPlayer.setVolume(1.0);
+      await _sfxPlayer.play(AssetSource('music/card_flip.wav'));
+    } catch (_) {}
+  }
+
+  static Future<void> playCardFlip() async {
     try {
       await _sfxPlayer.setReleaseMode(ReleaseMode.stop);
       await _sfxPlayer.setVolume(1.0);
