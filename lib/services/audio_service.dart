@@ -8,10 +8,22 @@ class AudioService {
   static Future<void> playBackground() async {
     if (_isBgPlaying) return;
     try {
-      await _bgPlayer.setReleaseMode(ReleaseMode.loop);
-      await _bgPlayer.setVolume(0.3); // 30% soft background volume
-      await _bgPlayer.play(AssetSource('music/background_music.mp3'));
       _isBgPlaying = true;
+      await _bgPlayer.setReleaseMode(ReleaseMode.stop);
+      await _bgPlayer.setVolume(0.3);
+
+      _bgPlayer.onPlayerComplete.listen((event) async {
+        if (!_isBgPlaying) return;
+        // Wait 1 minute before looping background music again
+        await Future.delayed(const Duration(minutes: 1));
+        if (_isBgPlaying) {
+          try {
+            await _bgPlayer.play(AssetSource('music/background_music.mp3'));
+          } catch (_) {}
+        }
+      });
+
+      await _bgPlayer.play(AssetSource('music/background_music.mp3'));
     } catch (e) {
       print("Audio background error: $e");
     }
@@ -57,9 +69,9 @@ class AudioService {
 
   static Future<void> stopAll() async {
     try {
+      _isBgPlaying = false;
       await _bgPlayer.stop();
       await _sfxPlayer.stop();
-      _isBgPlaying = false;
     } catch (_) {}
   }
 }
