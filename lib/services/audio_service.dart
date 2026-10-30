@@ -1,16 +1,33 @@
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/widgets.dart';
 
-class AudioService {
+class AudioService with WidgetsBindingObserver {
   static final AudioPlayer _bgPlayer = AudioPlayer();
   static final AudioPlayer _sfxPlayer = AudioPlayer();
   static bool _isBgPlaying = false;
+  static final AudioService _instance = AudioService._internal();
+
+  factory AudioService() => _instance;
+  AudioService._internal();
+
+  static void initialize() {
+    WidgetsBinding.instance.addObserver(_instance);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      stopAll();
+    } else if (state == AppLifecycleState.resumed) {
+      playBackground();
+    }
+  }
 
   static Future<void> playBackground() async {
     if (_isBgPlaying) return;
     try {
       _bgPlayer.onPlayerComplete.listen((event) async {
         _isBgPlaying = false;
-        // 1 minute interval before looping background music again
         await Future.delayed(const Duration(minutes: 1));
         playBackground();
       });
