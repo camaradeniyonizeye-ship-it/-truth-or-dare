@@ -52,10 +52,6 @@ class LanguageSelectionScreen extends StatelessWidget {
                           MaterialPageRoute(
                             builder: (context) => PlayerSetupScreen(
                               language: lang['code'],
-                              onPlayersReady: (players) {
-                                AudioService.playClick();
-                                Navigator.pushNamed(context, '/difficulty', arguments: players);
-                              },
                             ),
                           ),
                         );
