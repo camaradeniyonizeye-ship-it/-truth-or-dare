@@ -6,7 +6,8 @@ import '../models/player.dart';
 class QuestionLoader {
   static Future<List<Question>> loadQuestions(String language, {String category = 'Vanilla'}) async {
     try {
-      final String jsonString = await rootBundle.loadString('assets/data/locales/$language.json');
+      final String filename = language.toLowerCase();
+      final String jsonString = await rootBundle.loadString('assets/data/locales/$filename.json');
       final dynamic decoded = json.decode(jsonString);
 
       List<Question> questions = [];
@@ -64,24 +65,33 @@ class QuestionLoader {
       String rawText, Player? currentPlayer, List<Player> allPlayers) {
     if (currentPlayer == null) return rawText;
 
+    // 1. Replace player placeholder with the active turn player's name
     String processed = rawText.replaceAll('{player}', currentPlayer.name);
 
+    // 2. Strict Partnering / Target Substitution Logic
     if (processed.contains('{target}') || processed.contains('{partner}')) {
-      final oppositeGender = currentPlayer.gender == 'Male' ? 'Female' : 'Male';
-      final potentialTargets = allPlayers
-          .where((p) => p.id != currentPlayer.id && p.gender == oppositeGender)
-          .toList();
+      // Find all other players excluding the current player
+      final otherPlayers = allPlayers.where((p) => p.id != currentPlayer.id).toList();
 
-      final targetPool = potentialTargets.isNotEmpty
-          ? potentialTargets
-          : allPlayers.where((p) => p.id != currentPlayer.id).toList();
+      if (otherPlayers.isNotEmpty) {
+        // Strictly prioritize opposite gender
+        final currentPlayerGender = currentPlayer.gender.trim().toLowerCase();
+        final oppositeGenderTargets = otherPlayers.where((p) {
+          final pGender = p.gender.trim().toLowerCase();
+          return pGender != currentPlayerGender && (pGender == 'male' || pGender == 'female');
+        }).toList();
 
-      if (targetPool.isNotEmpty) {
+        // Fallback pool if no opposite gender exists (e.g. same-gender group)
+        final targetPool = oppositeGenderTargets.isNotEmpty ? oppositeGenderTargets : otherPlayers;
+
+        // Select a strict, distinct target
         final target = targetPool[DateTime.now().millisecondsSinceEpoch % targetPool.length];
+
         processed = processed
             .replaceAll('{target}', target.name)
             .replaceAll('{partner}', target.name);
       } else {
+        // Absolute fallback if playing solo or list is empty
         processed = processed
             .replaceAll('{target}', 'someone')
             .replaceAll('{partner}', 'someone');
