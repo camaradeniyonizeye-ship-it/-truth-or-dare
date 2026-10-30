@@ -10,9 +10,17 @@ class QuestionLoader {
       final Map<String, dynamic> jsonData = json.decode(jsonString);
 
       List<Question> questions = [];
+      String targetCategory = category.trim().toLowerCase();
+      String? matchedKey;
 
-      if (jsonData.containsKey(category)) {
-        final categoryData = jsonData[category] as List<dynamic>;
+      jsonData.forEach((key, value) {
+        if (key.trim().toLowerCase() == targetCategory) {
+          matchedKey = key;
+        }
+      });
+
+      if (matchedKey != null && jsonData[matchedKey] is List) {
+        final categoryData = jsonData[matchedKey] as List<dynamic>;
         for (var item in categoryData) {
           questions.add(Question.fromJson(item));
         }
