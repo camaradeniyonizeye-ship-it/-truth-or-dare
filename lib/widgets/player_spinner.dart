@@ -54,8 +54,8 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
     // Calculate exact center angle of the selected slice
     final double sliceCenter = (selectedIndex * sliceAngle) + (sliceAngle / 2);
     
-    // Target angle to align the chosen slice precisely with the top pointer (-pi/2)
-    final double targetAngle = (2 * math.pi * 6) + ((3 * math.pi / 2) - sliceCenter);
+    // Target rotation angle to align the chosen slice precisely with the top pointer
+    final double targetAngle = (2 * math.pi * 6) - sliceCenter;
 
     _controller.reset();
 
@@ -147,7 +147,7 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
         ElevatedButton(
           onPressed: _isSpinning ? null : () => _spinWheel(activePool),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.pinkAccent,
+            backgroundColor: const Color(0xFFFF0080),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -182,16 +182,20 @@ class _WheelPainter extends CustomPainter {
       const Color(0xFF303F9F),
     ];
 
+    // Align start angle at top (-pi/2)
+    final double startAngleOffset = -math.pi / 2;
+
     for (int i = 0; i < players.length; i++) {
       final Paint paint = Paint()
         ..style = PaintingStyle.fill
         ..color = sliceColors[i % sliceColors.length];
 
-      canvas.drawArc(rect, i * sliceAngle, sliceAngle, true, paint);
+      final double sliceStart = startAngleOffset + (i * sliceAngle);
+      canvas.drawArc(rect, sliceStart, sliceAngle, true, paint);
 
       canvas.save();
       canvas.translate(center.dx, center.dy);
-      canvas.rotate(i * sliceAngle + sliceAngle / 2);
+      canvas.rotate(sliceStart + sliceAngle / 2);
 
       final TextPainter tp = TextPainter(
         text: TextSpan(
