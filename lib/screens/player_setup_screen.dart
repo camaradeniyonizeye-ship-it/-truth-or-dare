@@ -3,9 +3,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/player.dart';
 
 class PlayerSetupScreen extends StatefulWidget {
+  final String? language;
   final Function(List<Player>) onPlayersReady;
 
-  const PlayerSetupScreen({super.key, required this.onPlayersReady});
+  const PlayerSetupScreen({
+    super.key,
+    this.language,
+    required this.onPlayersReady,
+  });
 
   @override
   State<PlayerSetupScreen> createState() => _PlayerSetupScreenState();
@@ -60,7 +65,7 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Players')),
+      appBar: AppBar(title: Text('Add Players (${widget.language ?? "English"})')),
       body: Container(
         padding: const EdgeInsets.all(16),
         decoration: const BoxDecoration(
