@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
+import 'services/audio_service.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  AudioService.initialize();
   runApp(const TruthOrDareApp());
 }
 
