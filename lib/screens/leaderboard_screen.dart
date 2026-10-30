@@ -21,11 +21,7 @@ class LeaderboardScreen extends StatelessWidget {
       child: Container(
         constraints: const BoxConstraints(maxHeight: 500, maxWidth: 400),
         decoration: BoxDecoration(
-          image: const DecorationImage(
-            image: AssetImage('assets/images/leaderboard_bg.jpg'),
-            fit: BoxFit.cover,
-            opacity: 0.9,
-          ),
+          color: Colors.black.withOpacity(0.95),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFFF0080), width: 2),
           boxShadow: [
@@ -70,7 +66,7 @@ class LeaderboardScreen extends StatelessWidget {
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.75),
+                      color: Colors.grey[900]?.withOpacity(0.9),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: _getRankColor(rank), width: 1.5),
                     ),
