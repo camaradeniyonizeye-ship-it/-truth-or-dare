@@ -48,14 +48,19 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
     final selectedPlayer = availablePlayers[random.nextInt(availablePlayers.length)];
     final selectedIndex = widget.players.indexOf(selectedPlayer);
 
-    final double sliceAngle = (2 * math.pi) / widget.players.length;
+    final int total = widget.players.length;
+    final double sliceAngle = (2 * math.pi) / total;
+    
+    // Calculate exact center angle of the selected slice
     final double sliceCenter = (selectedIndex * sliceAngle) + (sliceAngle / 2);
-    final double targetAngle = (2 * math.pi * 6) + (2 * math.pi - sliceCenter);
+    
+    // Target angle to align the chosen slice precisely with the top pointer (-pi/2)
+    final double targetAngle = (2 * math.pi * 6) + ((3 * math.pi / 2) - sliceCenter);
 
     _controller.reset();
 
     Animation<double> animation = Tween<double>(
-      begin: _angle,
+      begin: _angle % (2 * math.pi),
       end: targetAngle,
     ).animate(CurvedAnimation(
       parent: _controller,
@@ -72,6 +77,7 @@ class _PlayerSpinnerState extends State<PlayerSpinner>
       if (status == AnimationStatus.completed) {
         setState(() {
           _isSpinning = false;
+          _angle = targetAngle % (2 * math.pi);
         });
         widget.onPlayerSelected(selectedPlayer);
       }
