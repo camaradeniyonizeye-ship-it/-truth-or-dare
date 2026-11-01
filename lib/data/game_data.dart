@@ -4,9 +4,8 @@ import 'package:flutter/services.dart';
 class GameData {
   static Map<String, dynamic> _loadedDatabases = {};
 
-  static Future<init> init() async { // or Future<void> init() async
+  static Future<void> init() async {
     try {
-      // Correct paths pointing directly to assets/data/locales/
       final enString = await rootBundle.loadString('assets/data/locales/english.json');
       final frString = await rootBundle.loadString('assets/data/locales/french.json');
       final rwString = await rootBundle.loadString('assets/data/locales/kinyarwanda.json');
@@ -17,7 +16,7 @@ class GameData {
       _loadedDatabases['rw'] = jsonDecode(rwString);
       _loadedDatabases['es'] = jsonDecode(esString);
 
-      print("Success: All JSON databases preloaded from locales!");
+      print("Success: All JSON databases loaded from locales!");
     } catch (e) {
       print("CRITICAL ERROR loading JSON databases: $e");
     }
@@ -32,17 +31,11 @@ class GameData {
     required String otherPlayer,
   }) {
     final langData = _loadedDatabases[lang];
-    if (langData == null) {
-      print("Warning: Language '$lang' not found in cache. Using fallback defaults.");
-      return [];
-    }
+    if (langData == null) return [];
 
     try {
       final categoryData = langData[category];
-      if (categoryData == null) {
-        print("Warning: Category '$category' not found for language '$lang'.");
-        return [];
-      }
+      if (categoryData == null) return [];
 
       final List rawList = categoryData[type] ?? [];
 
@@ -54,7 +47,6 @@ class GameData {
       }).toList();
       
     } catch (e) {
-      print("Error parsing question structure: $e");
       return [];
     }
   }
