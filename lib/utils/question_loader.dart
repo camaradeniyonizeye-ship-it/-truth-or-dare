@@ -10,7 +10,7 @@ class QuestionLoader {
     _partners[player] = partner;
   }
 
-  /// Loads questions and returns List<Question> as required by difficulty selection screen.
+  /// Loads questions and returns List<Question> safely for difficulty selection.
   static Future<List<Question>> loadQuestions(
     String langKey, {
     String category = 'vanilla',
