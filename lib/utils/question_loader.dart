@@ -3,7 +3,6 @@ import '../models/question.dart';
 import '../data/game_data.dart';
 
 class QuestionLoader {
-  // Internal tracking maps to enforce rules without modifying player.dart
   static final Map<Player, String> _lastChoices = {};
   static final Map<Player, Player> _partners = {};
 
@@ -58,27 +57,43 @@ class QuestionLoader {
       otherPlayer: otherPlayer,
     );
 
-    // 4. Map strings to Question objects with placeholders replaced
-    return rawStrings.map((qText) {
+    // 4. Map strings to Question objects with required ID and explicit typing
+    int counter = 0;
+    return rawStrings.map<Question>((qText) {
       String processed = qText
           .replaceAll('{name}', playerName)
           .replaceAll('{partner}', partnerName)
           .replaceAll('{other_player}', otherPlayer);
       
-      // Instantiates your model (change to Question(processed) if your constructor is positional)
-      return Question(text: processed);
+      counter++;
+      return Question(
+        id: 'q_$counter',
+        text: processed,
+      );
     }).toList();
   }
 
-  /// Processes text placeholders supporting positional arguments matching game_screen.dart calls.
+  /// Processes text placeholders supporting flexible arguments matching game_screen.dart calls.
   static String processQuestionText(
     String text, [
     Player? currentPlayer,
-    String otherPlayer = 'Someone',
+    Object? otherPlayerOrPlayers,
   ]) {
-    String partnerName = (currentPlayer != null ? _partners[currentPlayer]?.name : null) ?? 'Partner';
     String playerName = currentPlayer?.name ?? 'Player';
-    
+    Player? partnerObj = currentPlayer != null ? _partners[currentPlayer] : null;
+    String partnerName = partnerObj?.name ?? 'Partner';
+    String otherPlayer = 'Someone';
+
+    if (otherPlayerOrPlayers is String) {
+      otherPlayer = otherPlayerOrPlayers;
+    } else if (otherPlayerOrPlayers is List<Player> && otherPlayerOrPlayers.isNotEmpty) {
+      final others = otherPlayerOrPlayers.where((p) => p != currentPlayer).toList();
+      if (others.isNotEmpty) {
+        others.shuffle();
+        otherPlayer = others.first.name;
+      }
+    }
+
     return text
         .replaceAll('{name}', playerName)
         .replaceAll('{partner}', partnerName)
