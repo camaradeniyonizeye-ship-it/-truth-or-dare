@@ -16,7 +16,7 @@ class GameData {
       _loadedDatabases['rw'] = jsonDecode(rwString);
       _loadedDatabases['es'] = jsonDecode(esString);
 
-      print("Success: All JSON databases preloaded successfully!");
+      print("SUCCESS: JSON databases loaded. Keys found in EN: ${_loadedDatabases['en']?.keys.toList()}");
     } catch (e) {
       print("CRITICAL ERROR loading JSON databases: $e");
     }
@@ -32,42 +32,49 @@ class GameData {
   }) {
     final langData = _loadedDatabases[lang];
     if (langData == null) {
-      print("Warning: Language '$lang' not found in cache.");
-      return [];
+      print("DEBUG: Language '$lang' not found in cache. Using fallbacks.");
+      return _getFallbackQuestions(type, playerName, partnerName, otherPlayer);
     }
 
-    // Case-insensitive category lookup
+    // Flexible category search
     String? matchedCategoryKey;
     for (var key in langData.keys) {
-      if (key.toLowerCase() == category.toLowerCase()) {
+      if (key.toLowerCase().contains(category.toLowerCase()) || 
+          category.toLowerCase().contains(key.toLowerCase())) {
         matchedCategoryKey = key;
         break;
       }
     }
 
     if (matchedCategoryKey == null) {
-      print("Warning: Category '$category' not found in language '$lang'.");
-      return [];
+      print("DEBUG: Category '$category' not found in lang '$lang'. Available: ${langData.keys}");
+      return _getFallbackQuestions(type, playerName, partnerName, otherPlayer);
     }
 
     final categoryData = langData[matchedCategoryKey];
-    if (categoryData is! Map) return [];
+    if (categoryData is! Map) {
+      return _getFallbackQuestions(type, playerName, partnerName, otherPlayer);
+    }
 
-    // Case-insensitive type lookup (truth / dare)
+    // Flexible type search (truth/dare)
     String? matchedTypeKey;
     for (var key in categoryData.keys) {
-      if (key.toLowerCase() == type.toLowerCase()) {
+      if (key.toLowerCase().contains(type.toLowerCase()) || 
+          type.toLowerCase().contains(key.toLowerCase())) {
         matchedTypeKey = key;
         break;
       }
     }
 
     if (matchedTypeKey == null) {
-      print("Warning: Type '$type' not found for category '$category'.");
-      return [];
+      print("DEBUG: Type '$type' not found under category '$matchedCategoryKey'. Available: ${categoryData.keys}");
+      return _getFallbackQuestions(type, playerName, partnerName, otherPlayer);
     }
 
     final List rawList = categoryData[matchedTypeKey] ?? [];
+    if (rawList.isEmpty) {
+      return _getFallbackQuestions(type, playerName, partnerName, otherPlayer);
+    }
 
     return rawList.map((q) {
       return q.toString()
@@ -75,5 +82,22 @@ class GameData {
           .replaceAll('{partner}', partnerName)
           .replaceAll('{other_player}', otherPlayer);
     }).toList();
+  }
+
+  // Emergency fallback list so the game never shows "No questions available"
+  static List<String> _getFallbackQuestions(String type, String playerName, String partnerName, String otherPlayer) {
+    if (type.toLowerCase().contains('truth')) {
+      return [
+        "$playerName, what is your biggest secret?",
+        "$playerName, what do you secretly love most about $partnerName?",
+        "$playerName, what was your most embarrassing moment with $otherPlayer?"
+      ];
+    } else {
+      return [
+        "$playerName, give $partnerName a romantic massage for 1 minute.",
+        "$playerName, whisper a secret in $otherPlayer's ear.",
+        "$playerName, imitate your favorite celebrity right now."
+      ];
+    }
   }
 }
