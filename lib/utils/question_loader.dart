@@ -6,7 +6,6 @@ import '../models/player.dart';
 class QuestionLoader {
   static Future<List<Question>> loadQuestions(String language, {String category = 'Vanilla'}) async {
     try {
-      // Strictly lowercase to match repository filenames on Linux/GitHub Actions (english.json, french.json, etc.)
       final String filename = language.toLowerCase();
       final String jsonString = await rootBundle.loadString('assets/data/locales/$filename.json');
       final dynamic decoded = json.decode(jsonString);
@@ -26,13 +25,21 @@ class QuestionLoader {
         if (matchedKey != null && decoded[matchedKey] is List) {
           final categoryData = decoded[matchedKey] as List<dynamic>;
           for (var item in categoryData) {
-            questions.add(Question.fromJson(item));
+            var qMap = Map<String, dynamic>.from(item);
+            if (!qMap.containsKey('category') && !qMap.containsKey('difficulty')) {
+              qMap['category'] = category;
+            }
+            questions.add(Question.fromJson(qMap));
           }
         } else {
           decoded.forEach((key, value) {
             if (value is List) {
               for (var item in value) {
-                questions.add(Question.fromJson(item));
+                var qMap = Map<String, dynamic>.from(item);
+                if (!qMap.containsKey('category') && !qMap.containsKey('difficulty')) {
+                  qMap['category'] = key;
+                }
+                questions.add(Question.fromJson(qMap));
               }
             }
           });
@@ -66,26 +73,20 @@ class QuestionLoader {
       String rawText, Player? currentPlayer, List<Player> allPlayers) {
     if (currentPlayer == null) return rawText;
 
-    // 1. Replace player placeholder with the active turn player's name
     String processed = rawText.replaceAll('{player}', currentPlayer.name);
 
-    // 2. Strict Partnering / Target Substitution Logic
     if (processed.contains('{target}') || processed.contains('{partner}')) {
       final otherPlayers = allPlayers.where((p) => p.id != currentPlayer.id).toList();
 
       if (otherPlayers.isNotEmpty) {
         final currentPlayerGender = currentPlayer.gender.trim().toLowerCase();
         
-        // Strictly prioritize opposite gender
         final oppositeGenderTargets = otherPlayers.where((p) {
           final pGender = p.gender.trim().toLowerCase();
           return pGender != currentPlayerGender && (pGender == 'male' || pGender == 'female');
         }).toList();
 
-        // Fallback pool if no opposite gender exists (e.g. same-gender group)
         final targetPool = oppositeGenderTargets.isNotEmpty ? oppositeGenderTargets : otherPlayers;
-
-        // Select a strict, distinct target
         final target = targetPool[DateTime.now().millisecondsSinceEpoch % targetPool.length];
 
         processed = processed
