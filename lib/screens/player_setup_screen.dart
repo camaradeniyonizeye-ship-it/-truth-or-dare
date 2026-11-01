@@ -67,7 +67,6 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
     return Scaffold(
       appBar: AppBar(title: Text('Add Players (${widget.language ?? "English"})')),
       body: Container(
-        padding: const EdgeInsets.all(16),
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFF1a0033), Color(0xFF000000)],
@@ -75,97 +74,106 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
             end: Alignment.bottomCenter,
           ),
         ),
-        child: Column(
-          children: [
-            TextField(
-              controller: _nameController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Enter player name',
-                hintStyle: const TextStyle(color: Colors.white54),
-                filled: true,
-                fillColor: Colors.white12,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ChoiceChip(
-                  label: const Text('Male'),
-                  selected: _selectedGender == 'Male',
-                  onSelected: (val) => setState(() => _selectedGender = 'Male'),
+                TextField(
+                  controller: _nameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Enter player name',
+                    hintStyle: const TextStyle(color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.white12,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-                const SizedBox(width: 15),
-                ChoiceChip(
-                  label: const Text('Female'),
-                  selected: _selectedGender == 'Female',
-                  onSelected: (val) => setState(() => _selectedGender = 'Female'),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Male'),
+                      selected: _selectedGender == 'Male',
+                      onSelected: (val) => setState(() => _selectedGender = 'Male'),
+                    ),
+                    const SizedBox(width: 15),
+                    ChoiceChip(
+                      label: const Text('Female'),
+                      selected: _selectedGender == 'Female',
+                      onSelected: (val) => setState(() => _selectedGender = 'Female'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () => _addPlayer(_nameController.text, gender: _selectedGender),
+                  child: const Text('Add Player'),
+                ),
+                if (_frequentNames.isNotEmpty) ...[
+                  const SizedBox(height: 15),
+                  const Text('Frequent Players:', style: TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 8,
+                    runAlignment: WrapAlignment.center,
+                    children: _frequentNames.map((name) => ActionChip(
+                      label: Text(name),
+                      onPressed: () => _addPlayer(name, gender: 'Male'),
+                    )).toList(),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                const Text(
+                  'Players List:',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 10),
+                // Scrollable safe wrapper for dynamically added players
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _players.length,
+                  itemBuilder: (context, index) {
+                    final player = _players[index];
+                    return Card(
+                      color: Colors.white24,
+                      child: ListTile(
+                        title: Text(player.name, style: const TextStyle(color: Colors.white)),
+                        subtitle: Text('Gender: ${player.gender}', style: const TextStyle(color: Colors.white70)),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.redAccent),
+                          onPressed: () => _removePlayer(index),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.pinkAccent),
+                  onPressed: _players.length >= 2
+                      ? () {
+                          AudioService.playClick();
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DifficultySelectionScreen(
+                                players: _players,
+                                selectedLanguage: widget.language ?? 'English',
+                              ),
+                            ),
+                          );
+                        }
+                      : null,
+                  child: const Text('Start Game', style: TextStyle(fontSize: 18, color: Colors.white)),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () => _addPlayer(_nameController.text, gender: _selectedGender),
-              child: const Text('Add Player'),
-            ),
-            if (_frequentNames.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              const Text('Frequent Players:', style: TextStyle(color: Colors.white70)),
-              Wrap(
-                spacing: 8,
-                children: _frequentNames.map((name) => ActionChip(
-                  label: Text(name),
-                  onPressed: () => _addPlayer(name, gender: 'Male'),
-                )).toList(),
-              ),
-            ],
-            const SizedBox(height: 20),
-            const Text(
-              'Players List:',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _players.length,
-                itemBuilder: (context, index) {
-                  final player = _players[index];
-                  return Card(
-                    color: Colors.white24,
-                    child: ListTile(
-                      title: Text(player.name, style: const TextStyle(color: Colors.white)),
-                      subtitle: Text('Gender: ${player.gender}', style: const TextStyle(color: Colors.white70)),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.redAccent),
-                        onPressed: () => _removePlayer(index),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.pinkAccent),
-              onPressed: _players.length >= 2
-                  ? () {
-                      AudioService.playClick();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DifficultySelectionScreen(
-                            players: _players,
-                            selectedLanguage: widget.language ?? 'English',
-                          ),
-                        ),
-                      );
-                    }
-                  : null,
-              child: const Text('Start Game', style: TextStyle(fontSize: 18, color: Colors.white)),
-            ),
-          ],
+          ),
         ),
       ),
     );
