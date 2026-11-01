@@ -2,21 +2,16 @@ import 'package:flutter/material.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
 import 'services/audio_service.dart';
-import 'data/game_data.dart'; // Make sure this path matches your project structure
+import 'data/game_data.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // 1. Initialize audio service
   AudioService.initialize();
-  
-  // 2. Preload your JSON question databases into memory
   await GameData.init();
-
   runApp(const TruthOrDareApp());
 }
 
-class TruthOrDropApp extends StatelessWidget { // Keep your original class name if it was TruthOrDareApp
+class TruthOrDareApp extends StatelessWidget {
   const TruthOrDareApp({super.key});
 
   @override
