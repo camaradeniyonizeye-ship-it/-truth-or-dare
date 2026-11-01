@@ -158,11 +158,15 @@ class _DifficultySelectionScreenState
   Future<void> _startGame() async {
     setState(() => _loading = true);
     try {
-      List<Question> questions =
-          await QuestionLoader.loadQuestions(widget.selectedLanguage);
+      // Load questions specifically matching the selected category/difficulty
+      List<Question> questions = await QuestionLoader.loadQuestions(
+        widget.selectedLanguage,
+        category: _selected.displayName,
+      );
       
-      final filtered = questions.where((q) => q.difficulty == _selected).toList();
-      final finalQuestions = filtered.isNotEmpty ? filtered : questions;
+      final finalQuestions = questions.isNotEmpty 
+          ? questions 
+          : await QuestionLoader.loadQuestions(widget.selectedLanguage);
 
       if (!mounted) return;
       Navigator.push(
