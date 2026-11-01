@@ -16,7 +16,7 @@ class GameData {
       _loadedDatabases['rw'] = jsonDecode(rwString);
       _loadedDatabases['es'] = jsonDecode(esString);
 
-      print("Success: All JSON databases loaded from locales!");
+      print("Success: All JSON databases preloaded successfully!");
     } catch (e) {
       print("CRITICAL ERROR loading JSON databases: $e");
     }
@@ -31,23 +31,49 @@ class GameData {
     required String otherPlayer,
   }) {
     final langData = _loadedDatabases[lang];
-    if (langData == null) return [];
-
-    try {
-      final categoryData = langData[category];
-      if (categoryData == null) return [];
-
-      final List rawList = categoryData[type] ?? [];
-
-      return rawList.map((q) {
-        return q.toString()
-            .replaceAll('{name}', playerName)
-            .replaceAll('{partner}', partnerName)
-            .replaceAll('{other_player}', otherPlayer);
-      }).toList();
-      
-    } catch (e) {
+    if (langData == null) {
+      print("Warning: Language '$lang' not found in cache.");
       return [];
     }
+
+    // Case-insensitive category lookup
+    String? matchedCategoryKey;
+    for (var key in langData.keys) {
+      if (key.toLowerCase() == category.toLowerCase()) {
+        matchedCategoryKey = key;
+        break;
+      }
+    }
+
+    if (matchedCategoryKey == null) {
+      print("Warning: Category '$category' not found in language '$lang'.");
+      return [];
+    }
+
+    final categoryData = langData[matchedCategoryKey];
+    if (categoryData is! Map) return [];
+
+    // Case-insensitive type lookup (truth / dare)
+    String? matchedTypeKey;
+    for (var key in categoryData.keys) {
+      if (key.toLowerCase() == type.toLowerCase()) {
+        matchedTypeKey = key;
+        break;
+      }
+    }
+
+    if (matchedTypeKey == null) {
+      print("Warning: Type '$type' not found for category '$category'.");
+      return [];
+    }
+
+    final List rawList = categoryData[matchedTypeKey] ?? [];
+
+    return rawList.map((q) {
+      return q.toString()
+          .replaceAll('{name}', playerName)
+          .replaceAll('{partner}', partnerName)
+          .replaceAll('{other_player}', otherPlayer);
+    }).toList();
   }
 }
