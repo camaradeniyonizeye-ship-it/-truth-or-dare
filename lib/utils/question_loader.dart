@@ -57,7 +57,7 @@ class QuestionLoader {
       otherPlayer: otherPlayer,
     );
 
-    // 4. Map strings to Question objects with required ID and explicit typing
+    // 4. Map strings to Question objects with required ID, text, and type
     int counter = 0;
     return rawStrings.map<Question>((qText) {
       String processed = qText
@@ -69,6 +69,7 @@ class QuestionLoader {
       return Question(
         id: 'q_$counter',
         text: processed,
+        type: chosenType, // Satisfies the required model parameter
       );
     }).toList();
   }
