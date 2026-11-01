@@ -33,6 +33,7 @@ class QuestionLoader {
     }
 
     String chosenType = type.toLowerCase();
+    String chosenCategory = category.toLowerCase();
 
     // 2. Rule Enforcement: No choosing Truth twice continuously
     if (currentPlayer != null) {
@@ -50,14 +51,14 @@ class QuestionLoader {
     // 3. Fetch raw strings from GameData cache
     List<String> rawStrings = GameData.getQuestions(
       normalizedLang,
-      category.toLowerCase(),
+      chosenCategory,
       chosenType,
       playerName: playerName,
       partnerName: partnerName,
       otherPlayer: otherPlayer,
     );
 
-    // 4. Map strings to Question objects with required ID, text, and type
+    // 4. Map strings to Question objects supplying id, text, type, and category
     int counter = 0;
     return rawStrings.map<Question>((qText) {
       String processed = qText
@@ -69,7 +70,8 @@ class QuestionLoader {
       return Question(
         id: 'q_$counter',
         text: processed,
-        type: chosenType, // Satisfies the required model parameter
+        type: chosenType,
+        category: chosenCategory, // Satisfies the required constructor parameter
       );
     }).toList();
   }
