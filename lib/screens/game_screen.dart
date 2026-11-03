@@ -7,6 +7,7 @@ import '../models/player.dart';
 import '../models/question.dart';
 import '../services/audio_service.dart';
 import '../utils/question_loader.dart';
+import '../widgets/audio_toggle_button.dart';
 import '../widgets/challenge_card.dart';
 import '../widgets/dare_card.dart';
 import '../widgets/player_spinner.dart';
@@ -98,9 +99,7 @@ class _GameScreenState extends State<GameScreen> {
     updatedPlayers[playerIndex] = updatedPlayer;
     final resultText = successful ? '${player.name} completed the challenge! +${GameRules.pointsForCompletion} points.' : timedOut ? '${player.name} ran out of time. -${GameRules.pointsForFailure} points.' : '${player.name} skipped the challenge. -${GameRules.pointsForFailure} points.';
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resultText), backgroundColor: successful ? AppColors.neonGreen : AppColors.neonRed, duration: const Duration(seconds: 2)));
-    setState(() {
-      _gameState = _gameState.copyWith(players: updatedPlayers, currentType: ''); _selectedType = ''; _showQuestion = false; _showPlayerSpinner = true; _selectedPlayer = null; _currentQuestion = null; _challengeSecondsLeft = GameRules.dareDurationSeconds; _isResolvingChallenge = false;
-    });
+    setState(() { _gameState = _gameState.copyWith(players: updatedPlayers, currentType: ''); _selectedType = ''; _showQuestion = false; _showPlayerSpinner = true; _selectedPlayer = null; _currentQuestion = null; _challengeSecondsLeft = GameRules.dareDurationSeconds; _isResolvingChallenge = false; });
     if (updatedPlayers.isNotEmpty && updatedPlayers.every((item) => item.hasCompletedTurn)) WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _showLeaderboard(resetRoundOnContinue: true); });
   }
 
@@ -110,7 +109,14 @@ class _GameScreenState extends State<GameScreen> {
     setState(() { _gameState = _gameState.copyWith(players: _gameState.players.map((player) => player.copyWith(hasCompletedTurn: false)).toList()); });
   }));
 
-  void _endGame() {
+  Future<void> _endGame() async {
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => Dialog(backgroundColor: Colors.transparent, child: AppGlassPanel(accent: AppColors.neonPink, child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 50, height: 50, decoration: BoxDecoration(color: AppColors.neonPink.withOpacity(.12), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.flag_rounded, color: AppColors.neonPink)),
+      const SizedBox(height: 15), const Text('End the game?', style: TextStyle(color: AppColors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 7), const Text('Your current scores will decide the winner.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.muted, fontSize: 13)),
+      const SizedBox(height: 22), Row(children: [Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('KEEP PLAYING'))), const SizedBox(width: 10), Expanded(child: ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('END GAME')))]),
+    ]))));
+    if (confirmed != true || !mounted) return;
     final winner = _gameState.getWinner();
     if (winner == null) return;
     AudioService.playWinner();
@@ -121,32 +127,21 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     final isTruthDisabled = _selectedPlayer != null && _lastChosenTypePerPlayer[_selectedPlayer!.id] == 'truth';
     final stage = _showPlayerSpinner ? 'wheel' : _showTypeSelector ? 'choice' : 'challenge';
-    return Scaffold(
-      appBar: AppBar(title: Text(_selectedPlayer != null ? "${_selectedPlayer!.name.toUpperCase()}'S TURN" : 'TRUTH OR DARE'), actions: [
-        IconButton(tooltip: 'Show leaderboard', icon: const Icon(Icons.leaderboard_rounded, color: AppColors.gold), onPressed: () => _showLeaderboard()),
-        IconButton(tooltip: 'End game', icon: const Icon(Icons.flag_rounded, color: AppColors.neonPink), onPressed: _endGame),
-      ]),
-      body: AppBackground(child: SafeArea(top: false, child: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(20, 10, 20, 8), child: Row(children: [Expanded(child: _progressPill('ROUND', _gameState.players.where((p) => p.hasCompletedTurn).length, _gameState.players.length)), const SizedBox(width: 10), _progressPill('SCORE', _gameState.players.fold<int>(0, (sum, p) => sum + p.score), null)])),
-        Expanded(child: AnimatedSwitcher(duration: const Duration(milliseconds: 420), switchInCurve: Curves.easeOutCubic, switchOutCurve: Curves.easeInCubic, transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: SlideTransition(position: Tween<Offset>(begin: const Offset(0, .045), end: Offset.zero).animate(animation), child: child)), child: KeyedSubtree(key: ValueKey(stage), child: _showPlayerSpinner ? _buildSpinnerStage() : _showTypeSelector ? _buildChoiceStage(isTruthDisabled) : _buildQuestionStage()))),
-      ]))),
-    );
+    return Scaffold(appBar: AppBar(title: Text(_selectedPlayer != null ? "${_selectedPlayer!.name.toUpperCase()}'S TURN" : 'TRUTH OR DARE'), actions: [
+      const AudioToggleButton(),
+      IconButton(tooltip: 'Show leaderboard', icon: const Icon(Icons.leaderboard_rounded, color: AppColors.gold), onPressed: () => _showLeaderboard()),
+      IconButton(tooltip: 'End game', icon: const Icon(Icons.flag_rounded, color: AppColors.neonPink), onPressed: _endGame),
+    ]), body: AppBackground(child: SafeArea(top: false, child: Column(children: [
+      Padding(padding: const EdgeInsets.fromLTRB(20, 10, 20, 8), child: Row(children: [Expanded(child: _progressPill('ROUND', _gameState.players.where((p) => p.hasCompletedTurn).length, _gameState.players.length)), const SizedBox(width: 10), _progressPill('SCORE', _gameState.players.fold<int>(0, (sum, p) => sum + p.score), null)])),
+      Expanded(child: AnimatedSwitcher(duration: const Duration(milliseconds: 420), switchInCurve: Curves.easeOutCubic, switchOutCurve: Curves.easeInCubic, transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: SlideTransition(position: Tween<Offset>(begin: const Offset(0, .045), end: Offset.zero).animate(animation), child: child)), child: KeyedSubtree(key: ValueKey(stage), child: _showPlayerSpinner ? _buildSpinnerStage() : _showTypeSelector ? _buildChoiceStage(isTruthDisabled) : _buildQuestionStage()))),
+    ]))));
   }
 
   Widget _progressPill(String label, int value, int? total) => Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), decoration: BoxDecoration(color: Colors.white.withOpacity(.05), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white.withOpacity(.09))), child: Row(mainAxisSize: MainAxisSize.min, children: [Text(label, style: const TextStyle(color: AppColors.muted, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1)), const SizedBox(width: 8), Text(total == null ? '$value' : '$value/$total', style: const TextStyle(color: AppColors.white, fontSize: 12, fontWeight: FontWeight.w800))]));
 
-  Widget _buildSpinnerStage() => Center(child: SingleChildScrollView(padding: const EdgeInsets.symmetric(vertical: 16), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-    const AppSectionLabel('Every turn starts with a spin'), const SizedBox(height: 8), Text('Who’s up next?', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 28)), const SizedBox(height: 6), const Text('Let fate choose your player.', style: TextStyle(color: AppColors.muted, fontSize: 13)), const SizedBox(height: 18),
-    AppGlassPanel(padding: const EdgeInsets.fromLTRB(12, 18, 12, 18), child: PlayerSpinner(players: _gameState.players, onPlayerSelected: _onPlayerSelected)),
-  ])));
+  Widget _buildSpinnerStage() => Center(child: SingleChildScrollView(padding: const EdgeInsets.symmetric(vertical: 16), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const AppSectionLabel('Every turn starts with a spin'), const SizedBox(height: 8), Text('Who’s up next?', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 28)), const SizedBox(height: 6), const Text('Let fate choose your player.', style: TextStyle(color: AppColors.muted, fontSize: 13)), const SizedBox(height: 18), AppGlassPanel(padding: const EdgeInsets.fromLTRB(12, 18, 12, 18), child: PlayerSpinner(players: _gameState.players, onPlayerSelected: _onPlayerSelected))])));
 
-  Widget _buildChoiceStage(bool isTruthDisabled) => Center(child: SingleChildScrollView(padding: const EdgeInsets.all(22), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-    Container(width: 74, height: 74, decoration: BoxDecoration(shape: BoxShape.circle, color: _getGenderColor(_selectedPlayer?.gender ?? 'Other').withOpacity(.14), border: Border.all(color: _getGenderColor(_selectedPlayer?.gender ?? 'Other').withOpacity(.4))), child: Icon(Icons.person_rounded, color: _getGenderColor(_selectedPlayer?.gender ?? 'Other'), size: 36)),
-    const SizedBox(height: 17), const AppSectionLabel('Your moment'), const SizedBox(height: 8), Text("${_selectedPlayer?.name ?? ''}'s turn", textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 30)), const SizedBox(height: 8), const Text('Choose your path for this round.', style: TextStyle(color: AppColors.muted, fontSize: 13)),
-    if (isTruthDisabled) Padding(padding: const EdgeInsets.only(top: 18), child: AppGlassPanel(accent: AppColors.neonPink, padding: const EdgeInsets.all(12), child: const Row(children: [Icon(Icons.lock_outline_rounded, color: AppColors.neonPink, size: 18), SizedBox(width: 9), Expanded(child: Text('Truth is locked this turn—you chose it last time.', style: TextStyle(color: AppColors.white, fontSize: 12)))]))),
-    const SizedBox(height: 24), Row(children: [Expanded(child: _choiceCard('TRUTH', 'Be honest. No dodging.', Icons.visibility_rounded, AppColors.neonBlue, isTruthDisabled)), const SizedBox(width: 12), Expanded(child: _choiceCard('DARE', 'Take the challenge.', Icons.bolt_rounded, AppColors.neonPink, false))]),
-    const SizedBox(height: 24), SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: _selectedType.isNotEmpty ? _startQuestion : null, icon: const Icon(Icons.arrow_forward_rounded), label: const Text('REVEAL MY PROMPT')),
-  ])));
+  Widget _buildChoiceStage(bool isTruthDisabled) => Center(child: SingleChildScrollView(padding: const EdgeInsets.all(22), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Container(width: 74, height: 74, decoration: BoxDecoration(shape: BoxShape.circle, color: _getGenderColor(_selectedPlayer?.gender ?? 'Other').withOpacity(.14), border: Border.all(color: _getGenderColor(_selectedPlayer?.gender ?? 'Other').withOpacity(.4))), child: Icon(Icons.person_rounded, color: _getGenderColor(_selectedPlayer?.gender ?? 'Other'), size: 36)), const SizedBox(height: 17), const AppSectionLabel('Your moment'), const SizedBox(height: 8), Text("${_selectedPlayer?.name ?? ''}'s turn", textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 30)), const SizedBox(height: 8), const Text('Choose your path for this round.', style: TextStyle(color: AppColors.muted, fontSize: 13)), if (isTruthDisabled) Padding(padding: const EdgeInsets.only(top: 18), child: AppGlassPanel(accent: AppColors.neonPink, padding: const EdgeInsets.all(12), child: const Row(children: [Icon(Icons.lock_outline_rounded, color: AppColors.neonPink, size: 18), SizedBox(width: 9), Expanded(child: Text('Truth is locked this turn—you chose it last time.', style: TextStyle(color: AppColors.white, fontSize: 12)))]))), const SizedBox(height: 24), Row(children: [Expanded(child: _choiceCard('TRUTH', 'Be honest. No dodging.', Icons.visibility_rounded, AppColors.neonBlue, isTruthDisabled)), const SizedBox(width: 12), Expanded(child: _choiceCard('DARE', 'Take the challenge.', Icons.bolt_rounded, AppColors.neonPink, false))]), const SizedBox(height: 24), SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: _selectedType.isNotEmpty ? _startQuestion : null, icon: const Icon(Icons.arrow_forward_rounded), label: const Text('REVEAL MY PROMPT'))])));
 
   Widget _choiceCard(String title, String subtitle, IconData icon, Color color, bool disabled) {
     final selected = _selectedType == title.toLowerCase();
