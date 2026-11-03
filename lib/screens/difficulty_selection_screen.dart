@@ -70,7 +70,9 @@ class _DifficultySelectionScreenState
                     : const Text(
                         'START PLAYING',
                         style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black),
                       ),
               ),
             ),
@@ -158,15 +160,18 @@ class _DifficultySelectionScreenState
   Future<void> _startGame() async {
     setState(() => _loading = true);
     try {
-      // Load questions specifically matching the selected category/difficulty
-      List<Question> questions = await QuestionLoader.loadQuestions(
+      // Load both question types because the game lets players choose either.
+      final truthQuestions = await QuestionLoader.loadQuestions(
         widget.selectedLanguage,
         category: _selected.displayName,
+        type: 'truth',
       );
-      
-      final finalQuestions = questions.isNotEmpty 
-          ? questions 
-          : await QuestionLoader.loadQuestions(widget.selectedLanguage);
+      final dareQuestions = await QuestionLoader.loadQuestions(
+        widget.selectedLanguage,
+        category: _selected.displayName,
+        type: 'dare',
+      );
+      final questions = [...truthQuestions, ...dareQuestions];
 
       if (!mounted) return;
       Navigator.push(
@@ -174,14 +179,16 @@ class _DifficultySelectionScreenState
         MaterialPageRoute(
           builder: (context) => GameScreen(
             players: widget.players,
-            questions: finalQuestions,
+            questions: questions,
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: const Color(0xFFFF0000)),
+        SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: const Color(0xFFFF0000)),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
