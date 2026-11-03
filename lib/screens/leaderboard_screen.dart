@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../models/game_rules.dart';
 import '../models/player.dart';
 
 class LeaderboardScreen extends StatelessWidget {
@@ -13,103 +15,138 @@ class LeaderboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sorted = [...players];
-    sorted.sort((a, b) => b.score.compareTo(a.score));
+    final rankedPlayers = [...players]
+      ..sort((first, second) {
+        final scoreComparison = second.score.compareTo(first.score);
+        return scoreComparison != 0 ? scoreComparison : first.name.compareTo(second.name);
+      });
 
     return Dialog(
       backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Container(
-        constraints: const BoxConstraints(maxHeight: 500, maxWidth: 400),
+        constraints: const BoxConstraints(maxHeight: 560, maxWidth: 440),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.95),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFFF0080), width: 2),
+          color: const Color(0xFF111018),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFFF0080), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF0080).withOpacity(0.4),
-              blurRadius: 15,
+              color: const Color(0xFFFF0080).withOpacity(0.22),
+              blurRadius: 28,
               spreadRadius: 2,
             ),
           ],
         ),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(22),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'LEADERBOARD',
-                  style: TextStyle(
-                    color: Color(0xFFFFD700),
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
+                const Icon(Icons.leaderboard_rounded, color: Color(0xFFFFD700)),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'LEADERBOARD',
+                    style: TextStyle(
+                      color: Color(0xFFFFD700),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.4,
+                    ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
+                  tooltip: 'Continue game',
+                  icon: const Icon(Icons.close, color: Colors.white70),
                   onPressed: onContinue,
-                )
+                ),
               ],
             ),
-            const Divider(color: Color(0xFFFF0080), thickness: 1),
-            const SizedBox(height: 10),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: sorted.length,
-                itemBuilder: (ctx, i) {
-                  final p = sorted[i];
-                  final rank = i + 1;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[900]?.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _getRankColor(rank), width: 1.5),
-                    ),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: _getRankColor(rank),
-                        child: Text(
-                          '#$rank',
-                          style: const TextStyle(
-                              color: Colors.black, fontWeight: FontWeight.bold),
+            const Divider(color: Color(0x55FF0080), thickness: 1),
+            if (rankedPlayers.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 36),
+                child: Text('No players to rank yet.', style: TextStyle(color: Colors.white70)),
+              )
+            else ...[
+              const SizedBox(height: 10),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: rankedPlayers.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final player = rankedPlayers[index];
+                    final rank = index + 1;
+                    final rankColor = _rankColor(rank);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: rank == 1 ? const Color(0xFF282313) : const Color(0xFF1C1A23),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: rankColor.withOpacity(0.65)),
+                      ),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: rankColor,
+                          foregroundColor: Colors.black,
+                          child: Text('$rank', style: const TextStyle(fontWeight: FontWeight.w900)),
+                        ),
+                        title: Text(
+                          player.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          player.hasCompletedTurn ? 'Turn complete' : 'Ready for this round',
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD700).withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${player.score} pts',
+                            style: const TextStyle(
+                              color: Color(0xFFFFD700),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                      title: Text(
-                        p.name,
-                        style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      trailing: Text(
-                        '${p.score} pts',
-                        style: const TextStyle(
-                            color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 15),
+            ],
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF0080),
-                  foregroundColor: Colors.black,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 ),
                 onPressed: onContinue,
-                child: const Text(
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text(
                   'CONTINUE GAME',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 1),
                 ),
               ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Complete +${GameRules.pointsForCompletion}  •  Skip -${GameRules.pointsForFailure}',
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
             ),
           ],
         ),
@@ -117,16 +154,16 @@ class LeaderboardScreen extends StatelessWidget {
     );
   }
 
-  Color _getRankColor(int rank) {
+  Color _rankColor(int rank) {
     switch (rank) {
       case 1:
-        return const Color(0xFFFFD700); // Gold
+        return const Color(0xFFFFD700);
       case 2:
-        return const Color(0xFFC0C0C0); // Silver
+        return const Color(0xFFC0C0C0);
       case 3:
-        return const Color(0xFFCD7F32); // Bronze
+        return const Color(0xFFCD7F32);
       default:
-        return const Color(0xFF0080FF); // Blue
+        return const Color(0xFF0080FF);
     }
   }
 }

@@ -1,67 +1,64 @@
 import 'package:flutter/material.dart';
-import '../models/player.dart';
+
+import '../models/game_rules.dart';
 import '../models/question.dart';
+import 'challenge_card.dart';
 
 class DareCard extends StatelessWidget {
   final Question question;
-  final Player player;
+  final int countdownSeconds;
   final VoidCallback onComplete;
+  final VoidCallback onFail;
 
   const DareCard({
     super.key,
     required this.question,
-    required this.player,
+    required this.countdownSeconds,
     required this.onComplete,
+    required this.onFail,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFFF0080), width: 3),
-        image: const DecorationImage(
-          image: AssetImage('assets/images/card_dare.jpg'),
-          fit: BoxFit.cover,
-          opacity: 0.85,
+    final progress = (countdownSeconds / GameRules.dareDurationSeconds).clamp(0.0, 1.0).toDouble();
+    final timerColor = countdownSeconds <= 5 ? Colors.redAccent : const Color(0xFFFF0080);
+
+    return ChallengeCardSurface(
+      color: const Color(0xFFFF0080),
+      imagePath: 'assets/images/card_dare.jpg',
+      title: 'DARE',
+      question: question,
+      content: [
+        const SizedBox(height: 18),
+        Semantics(
+          liveRegion: true,
+          label: '$countdownSeconds seconds remaining',
+          child: Row(
+            children: [
+              Expanded(
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(8),
+                  backgroundColor: Colors.white24,
+                  valueColor: AlwaysStoppedAnimation<Color>(timerColor),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '${countdownSeconds}s',
+                style: TextStyle(color: timerColor, fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
         ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            'DARE',
-            style: TextStyle(
-              color: Color(0xFFFF0080),
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 4,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            question.text,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 40),
-          ElevatedButton(
-            onPressed: onComplete,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF0080),
-              foregroundColor: Colors.black,
-            ),
-            child: const Text('COMPLETED (+10 PTS)'),
-          ),
-        ],
-      ),
+        const SizedBox(height: 18),
+        ChallengeActions(
+          primaryColor: const Color(0xFFFF0080),
+          onComplete: onComplete,
+          onFail: onFail,
+        ),
+      ],
     );
   }
 }
