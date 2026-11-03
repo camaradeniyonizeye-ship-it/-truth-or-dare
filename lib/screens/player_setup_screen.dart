@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/player.dart';
+import '../services/audio_service.dart';
+import 'difficulty_selection_screen.dart';
 
 class PlayerSetupScreen extends StatefulWidget {
   final String? language;
@@ -24,6 +27,12 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
   void initState() {
     super.initState();
     _loadSavedPlayers();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSavedPlayers() async {
@@ -118,13 +127,13 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
                     ChoiceChip(
                       label: const Text('Male'),
                       selected: _selectedGender == 'Male',
-                      onSelected: (val) => setState(() => _selectedGender = 'Male'),
+                      onSelected: (value) => setState(() => _selectedGender = 'Male'),
                     ),
                     const SizedBox(width: 15),
                     ChoiceChip(
                       label: const Text('Female'),
                       selected: _selectedGender == 'Female',
-                      onSelected: (val) => setState(() => _selectedGender = 'Female'),
+                      onSelected: (value) => setState(() => _selectedGender = 'Female'),
                     ),
                   ],
                 ),
@@ -202,4 +211,3 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
     );
   }
 }
-
