@@ -16,10 +16,18 @@ class AudioService with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
-      stopAll();
-    } else if (state == AppLifecycleState.resumed) {
-      playBackground();
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        // Stop music and effects when minimized, screen-locked, or exiting.
+        stopAll();
+        break;
+      case AppLifecycleState.resumed:
+        // Resume background music when the app returns to the foreground.
+        playBackground();
+        break;
     }
   }
 
@@ -37,6 +45,7 @@ class AudioService with WidgetsBindingObserver {
       await _bgPlayer.play(AssetSource('music/background_music.mp3'));
       _isBgPlaying = true;
     } catch (e) {
+      _isBgPlaying = false;
       print('Audio background error: $e');
     }
   }
