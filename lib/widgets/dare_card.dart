@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../models/game_rules.dart';
 import '../models/question.dart';
 import '../theme/app_theme.dart';
@@ -11,13 +10,7 @@ class DareCard extends StatelessWidget {
   final VoidCallback onComplete;
   final VoidCallback onFail;
 
-  const DareCard({
-    super.key,
-    required this.question,
-    required this.countdownSeconds,
-    required this.onComplete,
-    required this.onFail,
-  });
+  const DareCard({super.key, required this.question, required this.countdownSeconds, required this.onComplete, required this.onFail});
 
   @override
   Widget build(BuildContext context) {
@@ -29,29 +22,30 @@ class DareCard extends StatelessWidget {
       title: 'DARE',
       question: question,
       content: [
-        const SizedBox(height: 22),
-        Semantics(
-          liveRegion: true,
-          label: '$countdownSeconds seconds remaining',
-          child: Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 8,
-                    backgroundColor: Colors.white12,
-                    valueColor: AlwaysStoppedAnimation<Color>(timerColor),
+        Padding(
+          padding: const EdgeInsets.only(top: 11),
+          child: Semantics(
+            liveRegion: true,
+            label: '$countdownSeconds seconds remaining',
+            child: Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 7,
+                      backgroundColor: Colors.white12,
+                      valueColor: AlwaysStoppedAnimation<Color>(timerColor),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Text('$countdownSeconds s', style: TextStyle(color: timerColor, fontSize: 17, fontWeight: FontWeight.w900)),
-            ],
+                const SizedBox(width: 10),
+                Text('$countdownSeconds s', style: TextStyle(color: timerColor, fontSize: 14, fontWeight: FontWeight.w900)),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 18),
         ChallengeActions(primaryColor: AppColors.neonPink, onComplete: onComplete, onFail: onFail),
       ],
     );

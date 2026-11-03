@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-
-import '../models/game_rules.dart';
 import '../models/question.dart';
 import '../theme/app_theme.dart';
 import 'challenge_card.dart';
@@ -13,10 +11,10 @@ class TruthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ChallengeCardSurface(
-        color: AppColors.neonBlue,
+        color: AppColors.neonPurple,
         imagePath: 'assets/images/card_truth.jpg',
         title: 'TRUTH',
         question: question,
-        content: [const SizedBox(height: 30), ChallengeActions(primaryColor: AppColors.neonBlue, onComplete: onComplete, onFail: onFail)],
+        content: [ChallengeActions(primaryColor: AppColors.neonPurple, onComplete: onComplete, onFail: onFail)],
       );
 }
