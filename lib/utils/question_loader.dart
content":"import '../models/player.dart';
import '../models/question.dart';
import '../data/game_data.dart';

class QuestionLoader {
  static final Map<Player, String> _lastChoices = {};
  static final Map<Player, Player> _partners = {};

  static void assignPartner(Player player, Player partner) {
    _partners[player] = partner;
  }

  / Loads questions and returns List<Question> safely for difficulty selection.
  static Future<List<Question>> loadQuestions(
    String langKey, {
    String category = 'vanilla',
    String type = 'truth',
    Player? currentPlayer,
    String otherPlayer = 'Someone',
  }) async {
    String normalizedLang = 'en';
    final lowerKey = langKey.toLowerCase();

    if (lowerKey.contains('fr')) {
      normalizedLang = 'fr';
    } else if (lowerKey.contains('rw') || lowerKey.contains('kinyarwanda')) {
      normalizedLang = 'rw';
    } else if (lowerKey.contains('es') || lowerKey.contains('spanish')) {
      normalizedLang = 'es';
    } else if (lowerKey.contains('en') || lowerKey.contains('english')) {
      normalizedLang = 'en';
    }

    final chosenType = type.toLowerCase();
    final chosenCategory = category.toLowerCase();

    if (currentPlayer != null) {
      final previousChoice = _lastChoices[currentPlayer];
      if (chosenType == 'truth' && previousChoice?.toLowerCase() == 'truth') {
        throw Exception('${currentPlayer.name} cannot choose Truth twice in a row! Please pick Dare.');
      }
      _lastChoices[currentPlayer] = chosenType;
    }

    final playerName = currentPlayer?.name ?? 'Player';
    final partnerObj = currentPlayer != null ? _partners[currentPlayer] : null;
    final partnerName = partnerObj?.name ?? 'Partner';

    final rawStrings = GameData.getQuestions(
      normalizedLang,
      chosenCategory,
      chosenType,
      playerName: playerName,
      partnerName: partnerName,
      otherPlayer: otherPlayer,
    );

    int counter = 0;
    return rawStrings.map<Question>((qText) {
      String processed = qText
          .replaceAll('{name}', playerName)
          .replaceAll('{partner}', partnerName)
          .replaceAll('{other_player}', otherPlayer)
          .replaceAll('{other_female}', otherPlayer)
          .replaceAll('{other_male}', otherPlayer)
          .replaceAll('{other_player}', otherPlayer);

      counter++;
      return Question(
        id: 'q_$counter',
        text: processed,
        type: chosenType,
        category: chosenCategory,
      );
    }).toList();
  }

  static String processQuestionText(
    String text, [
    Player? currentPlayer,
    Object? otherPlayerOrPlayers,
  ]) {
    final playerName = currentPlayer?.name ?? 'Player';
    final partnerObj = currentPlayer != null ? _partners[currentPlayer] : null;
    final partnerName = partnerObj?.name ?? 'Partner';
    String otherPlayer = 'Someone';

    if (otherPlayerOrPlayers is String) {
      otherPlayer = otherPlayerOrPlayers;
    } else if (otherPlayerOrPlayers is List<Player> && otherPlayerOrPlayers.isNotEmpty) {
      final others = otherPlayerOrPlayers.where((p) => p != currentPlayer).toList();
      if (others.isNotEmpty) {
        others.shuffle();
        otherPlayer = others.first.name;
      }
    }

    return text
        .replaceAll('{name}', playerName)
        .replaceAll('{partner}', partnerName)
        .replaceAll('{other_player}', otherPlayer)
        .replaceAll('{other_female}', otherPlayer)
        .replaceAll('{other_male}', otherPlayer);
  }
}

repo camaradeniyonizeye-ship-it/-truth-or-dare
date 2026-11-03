@@ -1,0 +1,109 @@
+import 'package:flutter/material.dart';
+import '../services/audio_service.dart';
+import 'language_selection_screen.dart';
+import '../data/game_data.dart';
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  bool _isReady = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    AudioService.playBackground();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      await GameData.init();
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isReady = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isReady = false;
+      });
+    }
+  }
+
+  void _goNext() {
+    if (!_isReady) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const LanguageSelectionScreen(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GestureDetector(
+        onTap: _goNext,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/bg_splash.jpg'),
+              fit: BoxFit.cover,
+            ),
+          ),
+          child: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(
+                      color: Colors.pinkAccent,
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      _isLoading
+                          ? 'Loading questions and game data...'
+                          : _isReady
+                              ? 'Tap anywhere to continue'
+                              : 'Data failed to load. Please try again.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    if (!_isLoading && !_isReady) ...[
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: _loadData,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.pinkAccent,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
