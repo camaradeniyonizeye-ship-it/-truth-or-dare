@@ -22,24 +22,23 @@ class GameData {
     }
   }
 
+  /// Returns unmodified templates so runtime question processing can replace
+  /// every token using the selected player and current roster.
   static List<String> getQuestions(
     String lang,
     String category,
-    String type, {
-    required String playerName,
-    required String partnerName,
-    required String otherPlayer,
-  }) {
+    String type,
+  ) {
     final langData = _loadedDatabases[lang];
     if (langData == null) {
       print("DEBUG: Language '$lang' not found in cache. Using fallbacks.");
-      return _getFallbackQuestions(type, playerName, partnerName, otherPlayer);
+      return _getFallbackQuestions(type);
     }
 
-    // Flexible category search
     String? matchedCategoryKey;
-    for (var key in langData.keys) {
-      if (key.toLowerCase().contains(category.toLowerCase()) || 
+    for (final dynamic rawKey in langData.keys) {
+      final key = rawKey.toString();
+      if (key.toLowerCase().contains(category.toLowerCase()) ||
           category.toLowerCase().contains(key.toLowerCase())) {
         matchedCategoryKey = key;
         break;
@@ -48,18 +47,16 @@ class GameData {
 
     if (matchedCategoryKey == null) {
       print("DEBUG: Category '$category' not found in lang '$lang'. Available: ${langData.keys}");
-      return _getFallbackQuestions(type, playerName, partnerName, otherPlayer);
+      return _getFallbackQuestions(type);
     }
 
     final categoryData = langData[matchedCategoryKey];
-    if (categoryData is! Map) {
-      return _getFallbackQuestions(type, playerName, partnerName, otherPlayer);
-    }
+    if (categoryData is! Map) return _getFallbackQuestions(type);
 
-    // Flexible type search (truth/dare)
     String? matchedTypeKey;
-    for (var key in categoryData.keys) {
-      if (key.toLowerCase().contains(type.toLowerCase()) || 
+    for (final dynamic rawKey in categoryData.keys) {
+      final key = rawKey.toString();
+      if (key.toLowerCase().contains(type.toLowerCase()) ||
           type.toLowerCase().contains(key.toLowerCase())) {
         matchedTypeKey = key;
         break;
@@ -68,36 +65,28 @@ class GameData {
 
     if (matchedTypeKey == null) {
       print("DEBUG: Type '$type' not found under category '$matchedCategoryKey'. Available: ${categoryData.keys}");
-      return _getFallbackQuestions(type, playerName, partnerName, otherPlayer);
+      return _getFallbackQuestions(type);
     }
 
-    final List rawList = categoryData[matchedTypeKey] ?? [];
-    if (rawList.isEmpty) {
-      return _getFallbackQuestions(type, playerName, partnerName, otherPlayer);
-    }
-
-    return rawList.map((q) {
-      return q.toString()
-          .replaceAll('{name}', playerName)
-          .replaceAll('{partner}', partnerName)
-          .replaceAll('{other_player}', otherPlayer);
-    }).toList();
+    final rawList = categoryData[matchedTypeKey];
+    if (rawList is! List || rawList.isEmpty) return _getFallbackQuestions(type);
+    return rawList.map((question) => question.toString()).toList();
   }
 
-  // Emergency fallback list so the game never shows "No questions available"
-  static List<String> _getFallbackQuestions(String type, String playerName, String partnerName, String otherPlayer) {
+  /// Emergency templates still use the same runtime placeholder pipeline.
+  static List<String> _getFallbackQuestions(String type) {
     if (type.toLowerCase().contains('truth')) {
       return [
-        "$playerName, what is your biggest secret?",
-        "$playerName, what do you secretly love most about $partnerName?",
-        "$playerName, what was your most embarrassing moment with $otherPlayer?"
-      ];
-    } else {
-      return [
-        "$playerName, give $partnerName a romantic massage for 1 minute.",
-        "$playerName, whisper a secret in $otherPlayer's ear.",
-        "$playerName, imitate your favorite celebrity right now."
+        'Dear {name}, what is your biggest secret?',
+        'Dear {name}, what do you secretly love most about {partner}?',
+        'Dear {name}, what was your most embarrassing moment with {other_player}?',
       ];
     }
+
+    return [
+      'Dear {name}, give {partner} a friendly compliment.',
+      'Dear {name}, share a fun secret with {other_player}.',
+      'Dear {name}, imitate your favorite celebrity right now.',
+    ];
   }
 }

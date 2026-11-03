@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import '../models/player.dart';
 import '../models/question.dart';
 import '../data/game_data.dart';
@@ -5,64 +7,16 @@ import '../data/game_data.dart';
 class QuestionLoader {
   static final Map<Player, String> _lastChoices = {};
   static final Map<Player, Player> _partners = {};
+  static final Random _random = Random();
 
+  /// Registers a preferred partner. Runtime matching still validates that the
+  /// partner is another player and prefers an opposite-gender match.
   static void assignPartner(Player player, Player partner) {
     _partners[player] = partner;
   }
 
-  static Player? _findPartner(Player currentPlayer, List<Player> allPlayers) {
-    final oppositeGender = currentPlayer.gender.toLowerCase() == 'male'
-        ? 'female'
-        : 'male';
-
-    final sameGender = allPlayers
-        .where((p) => p.id != currentPlayer.id)
-        .toList();
-
-    final oppositeGenderPlayers = sameGender
-        .where((p) => p.gender.toLowerCase() == oppositeGender)
-        .toList();
-
-    if (oppositeGenderPlayers.isNotEmpty) {
-      oppositeGenderPlayers.shuffle();
-      return oppositeGenderPlayers.first;
-    }
-
-    if (sameGender.isNotEmpty) {
-      sameGender.shuffle();
-      return sameGender.first;
-    }
-
-    return null;
-  }
-
-  static String _pickNameForGender(
-    String gender,
-    Player? currentPlayer,
-    List<Player> players, {
-    required String fallback,
-  }) {
-    if (players.isEmpty) return fallback;
-
-    final withoutCurrent = players
-        .where((p) => currentPlayer == null || p.id != currentPlayer.id)
-        .toList();
-
-    if (withoutCurrent.isEmpty) return fallback;
-
-    final candidates = withoutCurrent
-        .where((p) => p.gender.toLowerCase() == gender.toLowerCase())
-        .toList();
-
-    if (candidates.isNotEmpty) {
-      candidates.shuffle();
-      return candidates.first.name;
-    }
-
-    return withoutCurrent.first.name;
-  }
-
-  /// Loads questions and returns List<Question> safely for difficulty selection.
+  /// Loads raw question templates. Names are substituted at the moment a
+  /// question is shown, when the active player and full roster are available.
   static Future<List<Question>> loadQuestions(
     String langKey, {
     String category = 'vanilla',
@@ -70,126 +24,140 @@ class QuestionLoader {
     Player? currentPlayer,
     String otherPlayer = 'Someone',
   }) async {
-    // 1. Normalize language key ('en', 'fr', 'rw', 'es')
-    String normalizedLang = 'en';
-    String lowerKey = langKey.toLowerCase();
+    final normalizedLang = _normalizeLanguage(langKey);
+    final chosenType = type.toLowerCase();
+    final chosenCategory = category.toLowerCase();
 
-    if (lowerKey.contains('fr')) {
-      normalizedLang = 'fr';
-    } else if (lowerKey.contains('rw') || lowerKey.contains('kinyarwanda')) {
-      normalizedLang = 'rw';
-    } else if (lowerKey.contains('es') || lowerKey.contains('spanish')) {
-      normalizedLang = 'es';
-    } else if (lowerKey.contains('en') || lowerKey.contains('english')) {
-      normalizedLang = 'en';
-    }
-
-    String chosenType = type.toLowerCase();
-    String chosenCategory = category.toLowerCase();
-
-    // 2. Rule Enforcement: No choosing Truth twice continuously
+    // Preserve the existing rule for callers that load questions for a player.
     if (currentPlayer != null) {
-      String? previousChoice = _lastChoices[currentPlayer];
-      if (chosenType == 'truth' && previousChoice?.toLowerCase() == 'truth') {
-        throw Exception("${currentPlayer.name} cannot choose Truth twice in a row! Please pick Dare.");
+      final previousChoice = _lastChoices[currentPlayer];
+      if (chosenType == 'truth' && previousChoice == 'truth') {
+        throw Exception(
+          "${currentPlayer.name} cannot choose Truth twice in a row! Please pick Dare.",
+        );
       }
       _lastChoices[currentPlayer] = chosenType;
     }
 
-    String playerName = currentPlayer?.name ?? 'Player';
-    Player? partnerObj = currentPlayer != null ? (_partners[currentPlayer] ?? null) : null;
-    String partnerName = partnerObj?.name ?? 'Partner';
-    String targetName = partnerName == 'Partner' ? otherPlayer : partnerName;
-
-    String otherMale = (currentPlayer != null && currentPlayer.gender.toLowerCase() == 'male')
-        ? targetName
-        : otherPlayer;
-    String otherFemale = (currentPlayer != null && currentPlayer.gender.toLowerCase() == 'female')
-        ? targetName
-        : otherPlayer;
-
-    // 3. Fetch raw strings from GameData cache
-    List<String> rawStrings = GameData.getQuestions(
+    final rawStrings = GameData.getQuestions(
       normalizedLang,
       chosenCategory,
       chosenType,
-      playerName: playerName,
-      partnerName: partnerName,
-      otherPlayer: otherPlayer,
-      otherMale: otherMale,
-      otherFemale: otherFemale,
-      target: targetName,
     );
 
-    // 4. Map strings to Question objects supplying id, text, type, and category
-    int counter = 0;
-    return rawStrings.map<Question>((qText) {
-      String processed = qText
-          .replaceAll('{name}', playerName)
-          .replaceAll('{partner}', partnerName)
-          .replaceAll('{other_player}', otherPlayer)
-          .replaceAll('{other_male}', otherMale)
-          .replaceAll('{other_female}', otherFemale)
-          .replaceAll('{target}', targetName);
-
-      counter++;
+    return List<Question>.generate(rawStrings.length, (index) {
       return Question(
-        id: 'q_$counter',
-        text: processed,
+        id: 'q_${index + 1}',
+        text: rawStrings[index],
         type: chosenType,
         category: chosenCategory,
       );
-    }).toList();
+    });
   }
 
-  /// Processes text placeholders supporting flexible arguments matching game_screen.dart calls.
+  static String _normalizeLanguage(String langKey) {
+    final lowerKey = langKey.toLowerCase();
+    if (lowerKey.contains('fr')) return 'fr';
+    if (lowerKey.contains('rw') || lowerKey.contains('kinyarwanda')) return 'rw';
+    if (lowerKey.contains('es') || lowerKey.contains('spanish')) return 'es';
+    return 'en';
+  }
+
+  static List<Player> _otherPlayers(Player? currentPlayer, List<Player> players) {
+    return players.where((player) => player.id != currentPlayer?.id).toList();
+  }
+
+  static Player? _chooseRandom(List<Player> candidates) {
+    if (candidates.isEmpty) return null;
+    return candidates[_random.nextInt(candidates.length)];
+  }
+
+  static Player? _chooseTarget(Player? currentPlayer, List<Player> players) {
+    final others = _otherPlayers(currentPlayer, players);
+    if (others.isEmpty) return null;
+
+    final assigned = currentPlayer == null ? null : _partners[currentPlayer];
+    final validAssigned = assigned != null &&
+        others.any((player) => player.id == assigned.id);
+
+    if (currentPlayer != null) {
+      final gender = currentPlayer.gender.toLowerCase();
+      final oppositeGender = gender == 'male'
+          ? 'female'
+          : gender == 'female'
+              ? 'male'
+              : null;
+
+      if (oppositeGender != null) {
+        final oppositePlayers = others
+            .where((player) => player.gender.toLowerCase() == oppositeGender)
+            .toList();
+        if (oppositePlayers.isNotEmpty) {
+          if (validAssigned && assigned!.gender.toLowerCase() == oppositeGender) {
+            return assigned;
+          }
+          return _chooseRandom(oppositePlayers);
+        }
+      }
+    }
+
+    if (validAssigned) return assigned;
+    return _chooseRandom(others);
+  }
+
+  static String _chooseGenderName(
+    String gender,
+    Player? currentPlayer,
+    List<Player> players, {
+    required String fallback,
+  }) {
+    final candidates = _otherPlayers(currentPlayer, players)
+        .where((player) => player.gender.toLowerCase() == gender)
+        .toList();
+    return _chooseRandom(candidates)?.name ?? fallback;
+  }
+
+  /// Replaces all supported question tokens using players from the current
+  /// round. `{partner}` and `{target}` share the opposite-gender-preferred
+  /// target; if no opposite-gender player is available, any other player is
+  /// eligible. Gender-specific tokens fall back to that target when needed.
   static String processQuestionText(
     String text, [
     Player? currentPlayer,
     Object? otherPlayerOrPlayers,
   ]) {
-    String playerName = currentPlayer?.name ?? 'Player';
-    Player? partnerObj = currentPlayer != null ? _partners[currentPlayer] : null;
-    String partnerName = partnerObj?.name ?? 'Partner';
-    String otherPlayer = 'Someone';
-    List<Player> allPlayers = [];
-
-    if (otherPlayerOrPlayers is String) {
-      otherPlayer = otherPlayerOrPlayers;
-    } else if (otherPlayerOrPlayers is List<Player>) {
-      allPlayers = otherPlayerOrPlayers;
-      final others = allPlayers.where((p) => p != currentPlayer).toList();
-      if (others.isNotEmpty) {
-        others.shuffle();
-        otherPlayer = others.first.name;
-      }
-    }
-
-    if (currentPlayer != null && partnerObj == null && allPlayers.isNotEmpty) {
-      partnerObj = _findPartner(currentPlayer, allPlayers);
-      partnerName = partnerObj?.name ?? partnerName;
-    }
-
-    final targetName = partnerName == 'Partner' ? otherPlayer : partnerName;
-    final otherMale = _pickNameForGender(
+    final players = otherPlayerOrPlayers is List<Player>
+        ? otherPlayerOrPlayers
+        : <Player>[];
+    final playerName = currentPlayer?.name ?? 'Player';
+    final others = _otherPlayers(currentPlayer, players);
+    final explicitOtherPlayer = otherPlayerOrPlayers is String
+        ? otherPlayerOrPlayers
+        : null;
+    final otherPlayerName = explicitOtherPlayer ?? _chooseRandom(others)?.name ?? 'someone';
+    final target = _chooseTarget(currentPlayer, players);
+    final targetName = target?.name ?? explicitOtherPlayer ?? 'someone';
+    final partnerName = targetName;
+    final maleName = _chooseGenderName(
       'male',
       currentPlayer,
-      allPlayers,
+      players,
       fallback: targetName,
     );
-    final otherFemale = _pickNameForGender(
+    final femaleName = _chooseGenderName(
       'female',
       currentPlayer,
-      allPlayers,
+      players,
       fallback: targetName,
     );
 
     return text
         .replaceAll('{name}', playerName)
+        .replaceAll('{player}', playerName)
         .replaceAll('{partner}', partnerName)
-        .replaceAll('{other_player}', otherPlayer)
-        .replaceAll('{other_male}', otherMale)
-        .replaceAll('{other_female}', otherFemale)
-        .replaceAll('{target}', targetName);
+        .replaceAll('{target}', targetName)
+        .replaceAll('{other_player}', otherPlayerName)
+        .replaceAll('{other_male}', maleName)
+        .replaceAll('{other_female}', femaleName);
   }
 }
