@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../models/player.dart';
 import '../models/question.dart';
 import '../models/game_state.dart';
@@ -28,6 +31,8 @@ class _GameScreenState extends State<GameScreen> {
   bool _showTypeSelector = false;
   bool _showQuestion = false;
   Question? _currentQuestion;
+  Timer? _challengeTimer;
+  int _challengeSecondsLeft = 15;
 
   final Map<String, String> _lastChosenTypePerPlayer = {};
 
@@ -40,6 +45,7 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   void dispose() {
+    _challengeTimer?.cancel();
     AudioService.stopAll();
     super.dispose();
   }
@@ -119,20 +125,82 @@ class _GameScreenState extends State<GameScreen> {
       _showQuestion = true;
       AudioService.playCardFlip();
     });
+
+    if (_selectedType.toLowerCase() == 'dare') {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _startDareTimer());
+    } else {
+      _challengeTimer?.cancel();
+      _challengeSecondsLeft = 15;
+    }
   }
 
-  void _completeQuestion() {
+  void _startDareTimer() {
+    _challengeTimer?.cancel();
+    _challengeSecondsLeft = 15;
+
+    _challengeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _selectedPlayer == null || _currentQuestion == null) {
+        timer.cancel();
+        return;
+      }
+
+      if (_currentQuestion!.type != 'dare') {
+        timer.cancel();
+        return;
+      }
+
+      if (_challengeSecondsLeft <= 1) {
+        timer.cancel();
+        _applyChallengeResult(successful: false, timedOut: true);
+        return;
+      }
+
+      setState(() {
+        _challengeSecondsLeft--;
+      });
+    });
+  }
+
+  void _applyChallengeResult({required bool successful, bool timedOut = false}) {
     AudioService.playClick();
     if (_selectedPlayer == null || _currentQuestion == null) return;
 
+    _challengeTimer?.cancel();
+    final pointsDelta = successful ? 10 : -5;
     final updatedPlayer = _selectedPlayer!.copyWith(
-      score: _selectedPlayer!.score + 10,
+      score: _selectedPlayer!.score + pointsDelta,
       hasCompletedTurn: true,
     );
 
     final updatedPlayers = [..._gameState.players];
     final idx = _gameState.players.indexWhere((p) => p.id == _selectedPlayer!.id);
     if (idx != -1) updatedPlayers[idx] = updatedPlayer;
+
+    if (!successful && timedOut) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${_selectedPlayer!.name} timed out! -5 points'),
+          backgroundColor: const Color(0xFFFF0000),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else if (successful) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${_selectedPlayer!.name} completed it! +10 points'),
+          backgroundColor: const Color(0xFF00C853),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${_selectedPlayer!.name} missed it! -5 points'),
+          backgroundColor: const Color(0xFFFF6D00),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
 
     setState(() {
       _gameState = _gameState.copyWith(players: updatedPlayers, currentType: '');
@@ -141,6 +209,7 @@ class _GameScreenState extends State<GameScreen> {
       _showPlayerSpinner = true;
       _selectedPlayer = null;
       _currentQuestion = null;
+      _challengeSecondsLeft = 15;
     });
 
     if (updatedPlayers.every((p) => p.hasCompletedTurn) && updatedPlayers.length > 1) {
@@ -323,12 +392,16 @@ class _GameScreenState extends State<GameScreen> {
                       ? TruthCard(
                           question: _currentQuestion!,
                           player: _selectedPlayer!,
-                          onComplete: _completeQuestion,
+                          countdownSeconds: _challengeSecondsLeft,
+                          onComplete: () => _applyChallengeResult(successful: true),
+                          onFail: () => _applyChallengeResult(successful: false),
                         )
                       : DareCard(
                           question: _currentQuestion!,
                           player: _selectedPlayer!,
-                          onComplete: _completeQuestion,
+                          countdownSeconds: _challengeSecondsLeft,
+                          onComplete: () => _applyChallengeResult(successful: true),
+                          onFail: () => _applyChallengeResult(successful: false),
                         ),
                 ),
             ],
@@ -373,3 +446,4 @@ class _GameScreenState extends State<GameScreen> {
   Color _getGenderColor(String g) =>
       g == 'Male' ? const Color(0xFF0080FF) : const Color(0xFFFF0080);
 }
+

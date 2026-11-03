@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
+
 import '../models/player.dart';
 import '../models/question.dart';
 
 class TruthCard extends StatelessWidget {
   final Question question;
   final Player player;
+  final int countdownSeconds;
   final VoidCallback onComplete;
+  final VoidCallback onFail;
 
   const TruthCard({
     super.key,
     required this.question,
     required this.player,
+    required this.countdownSeconds,
     required this.onComplete,
+    required this.onFail,
   });
 
   @override
@@ -51,17 +56,35 @@ class TruthCard extends StatelessWidget {
               height: 1.4,
             ),
           ),
-          const SizedBox(height: 40),
-          ElevatedButton(
-            onPressed: onComplete,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0080FF),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('COMPLETED (+10 PTS)'),
+          const SizedBox(height: 30),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onComplete,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0080FF),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('COMPLETED (+10)'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onFail,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('FAILED (-5)'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 }
+

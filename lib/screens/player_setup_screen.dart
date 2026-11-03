@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/player.dart';
-import 'difficulty_selection_screen.dart';
-import '../services/audio_service.dart';
 
 class PlayerSetupScreen extends StatefulWidget {
   final String? language;
@@ -32,32 +30,54 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getStringList('frequent_players') ?? [];
     setState(() {
-      _frequentNames = saved;
+      _frequentNames = saved
+          .where((name) => name.trim().isNotEmpty)
+          .toSet()
+          .toList();
     });
   }
 
   Future<void> _saveFrequentPlayers() async {
     final prefs = await SharedPreferences.getInstance();
-    final names = _players.map((p) => p.name).toList();
+    final names = _frequentNames.toSet().toList();
     await prefs.setStringList('frequent_players', names);
   }
 
   void _addPlayer(String name, {String gender = 'Male'}) {
-    if (name.trim().isEmpty) return;
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+
     setState(() {
       _players.add(Player(
-        id: DateTime.now().millisecondsSinceEpoch.toString() + name,
-        name: name.trim(),
+        id: DateTime.now().millisecondsSinceEpoch.toString() + trimmed,
+        name: trimmed,
         gender: gender,
       ));
       _nameController.clear();
+
+      final alreadyExists = _frequentNames.any(
+        (savedName) => savedName.toLowerCase() == trimmed.toLowerCase(),
+      );
+      if (!alreadyExists) {
+        _frequentNames.insert(0, trimmed);
+      }
     });
+
     _saveFrequentPlayers();
   }
 
   void _removePlayer(int index) {
     setState(() {
       _players.removeAt(index);
+    });
+    _saveFrequentPlayers();
+  }
+
+  void _removeFrequentName(String name) {
+    setState(() {
+      _frequentNames.removeWhere(
+        (savedName) => savedName.toLowerCase() == name.toLowerCase(),
+      );
     });
     _saveFrequentPlayers();
   }
@@ -119,10 +139,14 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
                   const SizedBox(height: 5),
                   Wrap(
                     spacing: 8,
+                    runSpacing: 8,
                     runAlignment: WrapAlignment.center,
-                    children: _frequentNames.map((name) => ActionChip(
+                    children: _frequentNames.map((name) => InputChip(
                       label: Text(name),
-                      onPressed: () => _addPlayer(name, gender: 'Male'),
+                      onPressed: () => _addPlayer(name, gender: _selectedGender),
+                      deleteIcon: const Icon(Icons.close, size: 16),
+                      onDeleted: () => _removeFrequentName(name),
+                      backgroundColor: Colors.purple.withOpacity(0.2),
                     )).toList(),
                   ),
                 ],
@@ -132,7 +156,6 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 10),
-                // Scrollable safe wrapper for dynamically added players
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -179,3 +202,4 @@ class _PlayerSetupScreenState extends State<PlayerSetupScreen> {
     );
   }
 }
+

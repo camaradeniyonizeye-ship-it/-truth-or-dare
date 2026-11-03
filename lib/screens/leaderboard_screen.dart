@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../models/player.dart';
 
 class LeaderboardScreen extends StatelessWidget {
@@ -51,7 +52,7 @@ class LeaderboardScreen extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: onContinue,
-                )
+                ),
               ],
             ),
             const Divider(color: Color(0xFFFF0080), thickness: 1),
@@ -76,18 +77,34 @@ class LeaderboardScreen extends StatelessWidget {
                         child: Text(
                           '#$rank',
                           style: const TextStyle(
-                              color: Colors.black, fontWeight: FontWeight.bold),
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       title: Text(
                         p.name,
                         style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${p.score >= 0 ? "+" : ""}${p.score} points',
+                        style: TextStyle(
+                          color: p.score >= 0 ? const Color(0xFF7CFF5A) : const Color(0xFFFF6B6B),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       trailing: Text(
                         '${p.score} pts',
                         style: const TextStyle(
-                            color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 16),
+                          color: Color(0xFFFFD700),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   );
@@ -120,13 +137,14 @@ class LeaderboardScreen extends StatelessWidget {
   Color _getRankColor(int rank) {
     switch (rank) {
       case 1:
-        return const Color(0xFFFFD700); // Gold
+        return const Color(0xFFFFD700);
       case 2:
-        return const Color(0xFFC0C0C0); // Silver
+        return const Color(0xFFC0C0C0);
       case 3:
-        return const Color(0xFFCD7F32); // Bronze
+        return const Color(0xFFCD7F32);
       default:
-        return const Color(0xFF0080FF); // Blue
+        return const Color(0xFF0080FF);
     }
   }
 }
+
