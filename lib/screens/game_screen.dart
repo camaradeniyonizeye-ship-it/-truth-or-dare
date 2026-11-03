@@ -1,17 +1,20 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../models/game_rules.dart';
+import '../models/game_state.dart';
 import '../models/player.dart';
 import '../models/question.dart';
-import '../models/game_state.dart';
-import '../widgets/truth_card.dart';
-import '../widgets/dare_card.dart';
-import '../widgets/player_spinner.dart';
-import 'leaderboard_screen.dart';
-import 'winner_screen.dart';
 import '../services/audio_service.dart';
 import '../utils/question_loader.dart';
+import '../widgets/challenge_card.dart';
+import '../widgets/dare_card.dart';
+import '../widgets/player_spinner.dart';
+import '../widgets/truth_card.dart';
+import 'leaderboard_screen.dart';
+import 'winner_screen.dart';
 
 class GameScreen extends StatefulWidget {
   final List<Player> players;
@@ -25,21 +28,23 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   late GameState _gameState;
+  final Random _random = Random();
+  final Map<String, String> _lastChosenTypePerPlayer = {};
+
   String _selectedType = '';
   Player? _selectedPlayer;
+  Question? _currentQuestion;
   bool _showPlayerSpinner = true;
   bool _showTypeSelector = false;
   bool _showQuestion = false;
-  Question? _currentQuestion;
+  bool _isResolvingChallenge = false;
   Timer? _challengeTimer;
-  int _challengeSecondsLeft = 15;
-
-  final Map<String, String> _lastChosenTypePerPlayer = {};
+  int _challengeSecondsLeft = GameRules.dareDurationSeconds;
 
   @override
   void initState() {
     super.initState();
-    _gameState = GameState(players: widget.players, questions: widget.questions);
+    _gameState = GameState(players: List.of(widget.players), questions: widget.questions);
     AudioService.playBackground();
   }
 
@@ -61,12 +66,13 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _selectType(String type) {
-    if (_selectedPlayer != null &&
-        type.toLowerCase() == 'truth' &&
-        _lastChosenTypePerPlayer[_selectedPlayer!.id] == 'truth') {
+    final player = _selectedPlayer;
+    if (player != null &&
+        type == 'truth' &&
+        _lastChosenTypePerPlayer[player.id] == 'truth') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('You chose Truth last turn! You must take a DARE this time!'),
+          content: Text('You chose Truth last turn! You must take a Dare this time.'),
           backgroundColor: Color(0xFFFF0080),
           duration: Duration(seconds: 2),
         ),
@@ -79,72 +85,67 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _startQuestion() {
-    if (_selectedType.isEmpty || _selectedPlayer == null) {
+    final player = _selectedPlayer;
+    if (_selectedType.isEmpty || player == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select Truth or Dare!'),
+          content: Text('Please select Truth or Dare.'),
           backgroundColor: Color(0xFFFF0000),
         ),
       );
       return;
     }
 
-    final available = _gameState.questions
-        .where((q) => q.type == _selectedType && !_gameState.usedQuestions.contains(q))
+    final matchingQuestions = _gameState.questions
+        .where((question) => question.type.toLowerCase() == _selectedType)
         .toList();
-
-    final pool = available.isNotEmpty
-        ? available
-        : _gameState.questions.where((q) => q.type == _selectedType).toList();
+    final unusedQuestions = matchingQuestions
+        .where((question) => !_gameState.usedQuestions.contains(question))
+        .toList();
+    final pool = unusedQuestions.isNotEmpty ? unusedQuestions : matchingQuestions;
 
     if (pool.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No questions available for this category!'),
+          content: Text('No questions are available for this type.'),
           backgroundColor: Color(0xFFFF0000),
         ),
       );
       return;
     }
 
-    final selected = pool[DateTime.now().millisecondsSinceEpoch % pool.length];
+    final selected = pool[_random.nextInt(pool.length)];
     final processedText = QuestionLoader.processQuestionText(
-        selected.text, _selectedPlayer, widget.players);
+      selected.text,
+      player,
+      _gameState.players,
+    );
 
-    _lastChosenTypePerPlayer[_selectedPlayer!.id] = _selectedType.toLowerCase();
+    _challengeTimer?.cancel();
+    _lastChosenTypePerPlayer[player.id] = _selectedType;
 
     setState(() {
       _currentQuestion = selected.copyWith(text: processedText);
       _gameState = _gameState.copyWith(
         currentType: _selectedType,
-        currentQuestionIndex: widget.questions.indexOf(selected),
+        currentQuestionIndex: _gameState.questions.indexOf(selected),
         usedQuestions: [..._gameState.usedQuestions, selected],
-        currentPlayerIndex: widget.players.indexOf(_selectedPlayer!),
+        currentPlayerIndex: _gameState.players.indexWhere((item) => item.id == player.id),
       );
+      _challengeSecondsLeft = GameRules.dareDurationSeconds;
       _showTypeSelector = false;
       _showQuestion = true;
-      AudioService.playCardFlip();
+      _isResolvingChallenge = false;
     });
 
-    if (_selectedType.toLowerCase() == 'dare') {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _startDareTimer());
-    } else {
-      _challengeTimer?.cancel();
-      _challengeSecondsLeft = 15;
-    }
+    AudioService.playCardFlip();
+    if (_selectedType == 'dare') _startDareTimer();
   }
 
   void _startDareTimer() {
     _challengeTimer?.cancel();
-    _challengeSecondsLeft = 15;
-
     _challengeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted || _selectedPlayer == null || _currentQuestion == null) {
-        timer.cancel();
-        return;
-      }
-
-      if (_currentQuestion!.type != 'dare') {
+      if (!mounted || _selectedPlayer == null || _currentQuestion?.type.toLowerCase() != 'dare') {
         timer.cancel();
         return;
       }
@@ -155,52 +156,45 @@ class _GameScreenState extends State<GameScreen> {
         return;
       }
 
-      setState(() {
-        _challengeSecondsLeft--;
-      });
+      setState(() => _challengeSecondsLeft--);
     });
   }
 
   void _applyChallengeResult({required bool successful, bool timedOut = false}) {
-    AudioService.playClick();
-    if (_selectedPlayer == null || _currentQuestion == null) return;
+    final player = _selectedPlayer;
+    if (player == null || _currentQuestion == null || _isResolvingChallenge) return;
 
+    _isResolvingChallenge = true;
     _challengeTimer?.cancel();
-    final pointsDelta = successful ? 10 : -5;
-    final updatedPlayer = _selectedPlayer!.copyWith(
-      score: _selectedPlayer!.score + pointsDelta,
+    AudioService.playClick();
+
+    final updatedPlayer = player.copyWith(
+      score: GameRules.scoreAfterChallenge(
+        currentScore: player.score,
+        completed: successful,
+      ),
       hasCompletedTurn: true,
     );
-
     final updatedPlayers = [..._gameState.players];
-    final idx = _gameState.players.indexWhere((p) => p.id == _selectedPlayer!.id);
-    if (idx != -1) updatedPlayers[idx] = updatedPlayer;
-
-    if (!successful && timedOut) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_selectedPlayer!.name} timed out! -5 points'),
-          backgroundColor: const Color(0xFFFF0000),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } else if (successful) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_selectedPlayer!.name} completed it! +10 points'),
-          backgroundColor: const Color(0xFF00C853),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_selectedPlayer!.name} missed it! -5 points'),
-          backgroundColor: const Color(0xFFFF6D00),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    final playerIndex = updatedPlayers.indexWhere((item) => item.id == player.id);
+    if (playerIndex == -1) {
+      _isResolvingChallenge = false;
+      return;
     }
+    updatedPlayers[playerIndex] = updatedPlayer;
+
+    final resultText = successful
+        ? '${player.name} completed the challenge! +${GameRules.pointsForCompletion} points.'
+        : timedOut
+            ? '${player.name} ran out of time. -${GameRules.pointsForFailure} points.'
+            : '${player.name} skipped the challenge. -${GameRules.pointsForFailure} points.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(resultText),
+        backgroundColor: successful ? const Color(0xFF00A86B) : const Color(0xFFFF6D00),
+        duration: const Duration(seconds: 2),
+      ),
+    );
 
     setState(() {
       _gameState = _gameState.copyWith(players: updatedPlayers, currentType: '');
@@ -209,46 +203,47 @@ class _GameScreenState extends State<GameScreen> {
       _showPlayerSpinner = true;
       _selectedPlayer = null;
       _currentQuestion = null;
-      _challengeSecondsLeft = 15;
+      _challengeSecondsLeft = GameRules.dareDurationSeconds;
+      _isResolvingChallenge = false;
     });
 
-    if (updatedPlayers.every((p) => p.hasCompletedTurn) && updatedPlayers.length > 1) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showLeaderboard());
+    final roundIsComplete = updatedPlayers.isNotEmpty &&
+        updatedPlayers.every((item) => item.hasCompletedTurn);
+    if (roundIsComplete) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showLeaderboard(resetRoundOnContinue: true);
+      });
     }
   }
 
-  void _showLeaderboard() {
-    showDialog(
+  void _showLeaderboard({bool resetRoundOnContinue = false}) {
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: SizedBox(
-          height: 500,
-          child: LeaderboardScreen(
-            players: _gameState.players,
-            onContinue: () {
-              Navigator.pop(context);
-              setState(() {
-                final reset = _gameState.players
-                    .map((p) => p.copyWith(hasCompletedTurn: false))
-                    .toList();
-                _gameState = _gameState.copyWith(players: reset);
-              });
-            },
-          ),
-        ),
+      builder: (dialogContext) => LeaderboardScreen(
+        players: _gameState.players,
+        onContinue: () {
+          Navigator.of(dialogContext).pop();
+          if (!resetRoundOnContinue || !mounted) return;
+          setState(() {
+            final resetPlayers = _gameState.players
+                .map((player) => player.copyWith(hasCompletedTurn: false))
+                .toList();
+            _gameState = _gameState.copyWith(players: resetPlayers);
+          });
+        },
       ),
     );
   }
 
   void _endGame() {
-    AudioService.playWinner();
     final winner = _gameState.getWinner();
     if (winner == null) return;
+
+    AudioService.playWinner();
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         builder: (context) => WinnerScreen(
           winner: winner,
           players: _gameState.players,
@@ -260,28 +255,28 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isTruthDisabled = _selectedPlayer != null &&
+    final isTruthDisabled = _selectedPlayer != null &&
         _lastChosenTypePerPlayer[_selectedPlayer!.id] == 'truth';
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _selectedPlayer != null
-              ? "${_selectedPlayer!.name}'s Turn"
-              : 'TRUTH OR DARE',
+          _selectedPlayer != null ? "${_selectedPlayer!.name}'s Turn" : 'TRUTH OR DARE',
           style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
           IconButton(
+            tooltip: 'Show leaderboard',
             icon: const Icon(Icons.leaderboard, color: Color(0xFFFFD700)),
-            onPressed: _showLeaderboard,
+            onPressed: () => _showLeaderboard(),
           ),
           IconButton(
+            tooltip: 'End game',
             icon: const Icon(Icons.flag, color: Color(0xFFFF0000)),
             onPressed: _endGame,
-          )
+          ),
         ],
       ),
       body: Container(
@@ -348,7 +343,8 @@ class _GameScreenState extends State<GameScreen> {
                             border: Border.all(color: Colors.pinkAccent),
                           ),
                           child: const Text(
-                            '⚠️ TRUTH locked! You picked Truth last turn.',
+                            'Truth is locked because it was chosen last turn.',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.pinkAccent,
                               fontWeight: FontWeight.bold,
@@ -367,14 +363,12 @@ class _GameScreenState extends State<GameScreen> {
                       ),
                       const SizedBox(height: 40),
                       ElevatedButton(
-                        onPressed: _startQuestion,
+                        onPressed: _selectedType.isNotEmpty ? _startQuestion : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _selectedType.isNotEmpty
-                              ? (_selectedType == 'truth'
-                                  ? const Color(0xFF0080FF)
-                                  : const Color(0xFFFF0080))
-                              : Colors.grey,
-                          foregroundColor: Colors.black,
+                          backgroundColor: _selectedType == 'truth'
+                              ? const Color(0xFF0080FF)
+                              : const Color(0xFFFF0080),
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                         ),
@@ -382,23 +376,20 @@ class _GameScreenState extends State<GameScreen> {
                           'CONTINUE',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.2),
                         ),
-                      )
+                      ),
                     ],
                   ),
                 ),
-              if (_showQuestion && _currentQuestion != null && _selectedPlayer != null)
+              if (_showQuestion && _currentQuestion != null)
                 Expanded(
-                  child: _currentQuestion!.type == 'truth'
+                  child: _currentQuestion!.type.toLowerCase() == 'truth'
                       ? TruthCard(
                           question: _currentQuestion!,
-                          player: _selectedPlayer!,
-                          countdownSeconds: _challengeSecondsLeft,
                           onComplete: () => _applyChallengeResult(successful: true),
                           onFail: () => _applyChallengeResult(successful: false),
                         )
                       : DareCard(
                           question: _currentQuestion!,
-                          player: _selectedPlayer!,
                           countdownSeconds: _challengeSecondsLeft,
                           onComplete: () => _applyChallengeResult(successful: true),
                           onFail: () => _applyChallengeResult(successful: false),
@@ -415,27 +406,33 @@ class _GameScreenState extends State<GameScreen> {
     final selected = _selectedType == type.toLowerCase();
     final activeColor = isDisabled ? Colors.grey : color;
 
-    return GestureDetector(
-      onTap: () => _selectType(type.toLowerCase()),
-      child: Opacity(
-        opacity: isDisabled ? 0.4 : 1.0,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-          decoration: BoxDecoration(
-            color: selected ? activeColor : Colors.transparent,
-            border: Border.all(color: selected ? Colors.white : activeColor, width: 2.5),
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: selected
-                ? [BoxShadow(color: activeColor.withOpacity(0.5), blurRadius: 10, spreadRadius: 1)]
-                : [],
-          ),
-          child: Text(
-            type.toUpperCase(),
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-              color: selected ? Colors.black : activeColor,
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: !isDisabled,
+      label: type,
+      child: GestureDetector(
+        onTap: isDisabled ? null : () => _selectType(type.toLowerCase()),
+        child: Opacity(
+          opacity: isDisabled ? 0.4 : 1,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+            decoration: BoxDecoration(
+              color: selected ? activeColor : Colors.transparent,
+              border: Border.all(color: selected ? Colors.white : activeColor, width: 2.5),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: selected
+                  ? [BoxShadow(color: activeColor.withOpacity(0.5), blurRadius: 10, spreadRadius: 1)]
+                  : [],
+            ),
+            child: Text(
+              type.toUpperCase(),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+                color: selected ? Colors.black : activeColor,
+              ),
             ),
           ),
         ),
@@ -443,7 +440,6 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Color _getGenderColor(String g) =>
-      g == 'Male' ? const Color(0xFF0080FF) : const Color(0xFFFF0080);
+  Color _getGenderColor(String gender) =>
+      gender == 'Male' ? const Color(0xFF0080FF) : const Color(0xFFFF0080);
 }
-
