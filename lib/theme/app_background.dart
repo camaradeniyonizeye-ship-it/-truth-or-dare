@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 
 import 'app_theme.dart';
 
@@ -16,27 +17,36 @@ class AppBackground extends StatelessWidget {
             stops: [0, .48, 1],
           ),
         ),
-        child: Stack(
-          children: [
-            Positioned(top: -110, right: -80, child: _Glow(color: AppColors.neonPink.withOpacity(.12), size: 260)),
-            Positioned(bottom: -130, left: -100, child: _Glow(color: AppColors.neonBlue.withOpacity(.10), size: 280)),
-            child,
-          ],
-        ),
+        child: Stack(children: [
+          Positioned(top: -110, right: -80, child: _Glow(color: AppColors.neonPink.withOpacity(.12), size: 260)),
+          Positioned(bottom: -130, left: -100, child: _Glow(color: AppColors.neonBlue.withOpacity(.10), size: 280)),
+          child,
+        ]),
       );
 }
 
-class _Glow extends StatelessWidget {
-  final Color color;
-  final double size;
-  const _Glow({required this.color, required this.size});
+class AppGlassPanel extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final BorderRadius borderRadius;
+  final Color? accent;
+  const AppGlassPanel({super.key, required this.child, this.padding = const EdgeInsets.all(18), this.borderRadius = const BorderRadius.all(Radius.circular(22)), this.accent});
 
   @override
-  Widget build(BuildContext context) => IgnorePointer(
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: color, blurRadius: 100, spreadRadius: 30)]),
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            padding: padding,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(.055),
+              borderRadius: borderRadius,
+              border: Border.all(color: accent?.withOpacity(.32) ?? Colors.white.withOpacity(.11)),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(.18), blurRadius: 28, offset: const Offset(0, 12))],
+            ),
+            child: child,
+          ),
         ),
       );
 }
@@ -44,10 +54,14 @@ class _Glow extends StatelessWidget {
 class AppSectionLabel extends StatelessWidget {
   final String text;
   const AppSectionLabel(this.text, {super.key});
-
   @override
-  Widget build(BuildContext context) => Text(
-        text.toUpperCase(),
-        style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.4),
-      );
+  Widget build(BuildContext context) => Text(text.toUpperCase(), style: const TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.4));
+}
+
+class _Glow extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _Glow({required this.color, required this.size});
+  @override
+  Widget build(BuildContext context) => IgnorePointer(child: Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: color, blurRadius: 100, spreadRadius: 30)])));
 }

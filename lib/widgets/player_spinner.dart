@@ -1,240 +1,102 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/player.dart';
+import '../theme/app_theme.dart';
 
 class PlayerSpinner extends StatefulWidget {
   final List<Player> players;
   final Function(Player) onPlayerSelected;
-
-  const PlayerSpinner({
-    super.key,
-    required this.players,
-    required this.onPlayerSelected,
-  });
-
+  const PlayerSpinner({super.key, required this.players, required this.onPlayerSelected});
   @override
   State<PlayerSpinner> createState() => _PlayerSpinnerState();
 }
 
-class _PlayerSpinnerState extends State<PlayerSpinner>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  double _angle = 0.0;
+class _PlayerSpinnerState extends State<PlayerSpinner> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  double _angle = 0;
   bool _isSpinning = false;
 
   @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    );
-  }
-
+  void initState() { super.initState(); _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 3600)); }
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  void dispose() { _controller.dispose(); super.dispose(); }
 
   void _spinWheel(List<Player> availablePlayers) {
-    if (_isSpinning || availablePlayers.isEmpty) return;
-
-    setState(() {
-      _isSpinning = true;
-    });
-
-    final random = math.Random();
-    final selectedPlayer = availablePlayers[random.nextInt(availablePlayers.length)];
-    final selectedIndex = widget.players.indexOf(selectedPlayer);
-
-    final int total = widget.players.length;
-    final double sliceAngle = (2 * math.pi) / total;
-    
-    // Calculate exact center angle of the selected slice
-    final double sliceCenter = (selectedIndex * sliceAngle) + (sliceAngle / 2);
-    
-    // Target rotation angle to align the chosen slice precisely with the top pointer
-    final double targetAngle = (2 * math.pi * 6) - sliceCenter;
-
+    if (_isSpinning || availablePlayers.isEmpty || widget.players.isEmpty) return;
+    setState(() => _isSpinning = true);
+    final selected = availablePlayers[math.Random().nextInt(availablePlayers.length)];
+    final index = widget.players.indexOf(selected);
+    final sliceAngle = 2 * math.pi / widget.players.length;
+    final current = _angle % (2 * math.pi);
+    final targetNormalized = (2 * math.pi - (index * sliceAngle + sliceAngle / 2)) % (2 * math.pi);
+    var delta = (targetNormalized - current) % (2 * math.pi);
+    if (delta < .08) delta += 2 * math.pi;
+    final target = _angle + 2 * math.pi * 6 + delta;
     _controller.reset();
-
-    Animation<double> animation = Tween<double>(
-      begin: _angle % (2 * math.pi),
-      end: targetAngle,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    ));
-
-    animation.addListener(() {
-      setState(() {
-        _angle = animation.value;
-      });
-    });
-
+    final animation = Tween<double>(begin: _angle, end: target).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart));
+    animation.addListener(() { if (mounted) setState(() => _angle = animation.value); });
     animation.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        setState(() {
-          _isSpinning = false;
-          _angle = targetAngle % (2 * math.pi);
-        });
-        widget.onPlayerSelected(selectedPlayer);
+      if (status == AnimationStatus.completed && mounted) {
+        setState(() { _isSpinning = false; _angle = targetNormalized; });
+        widget.onPlayerSelected(selected);
       }
     });
-
     _controller.forward();
   }
 
   @override
   Widget build(BuildContext context) {
-    final availablePlayers = widget.players.where((p) => !p.hasCompletedTurn).toList();
-    final activePool = availablePlayers.isNotEmpty ? availablePlayers : widget.players;
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            Transform.rotate(
-              angle: _angle,
-              child: CustomPaint(
-                size: const Size(280, 280),
-                painter: _WheelPainter(players: widget.players),
-              ),
-            ),
-            Positioned(
-              top: 0,
-              child: CustomPaint(
-                size: const Size(30, 30),
-                painter: _TrianglePainter(),
-              ),
-            ),
-            GestureDetector(
-              onTap: () => _spinWheel(activePool),
-              child: Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFF007F), Color(0xFF0080FF)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 8,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Text(
-                    'SPIN',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 30),
-        ElevatedButton(
-          onPressed: _isSpinning ? null : () => _spinWheel(activePool),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFFF0080),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-          ),
-          child: Text(
-            _isSpinning ? 'SPINNING...' : 'SPIN THE WHEEL',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ],
-    );
+    final remaining = widget.players.where((player) => !player.hasCompletedTurn).toList();
+    final activePool = remaining.isNotEmpty ? remaining : widget.players;
+    return LayoutBuilder(builder: (context, constraints) {
+      final diameter = math.min(320.0, math.min(constraints.maxWidth, MediaQuery.sizeOf(context).height * .39));
+      return Column(mainAxisSize: MainAxisSize.min, children: [
+        SizedBox(width: diameter, height: diameter, child: Stack(alignment: Alignment.center, children: [
+          Container(width: diameter, height: diameter, decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: AppColors.neonPink.withOpacity(.12), blurRadius: 34, spreadRadius: 4)])),
+          Transform.rotate(angle: _angle, child: CustomPaint(size: Size.square(diameter), painter: _WheelPainter(players: widget.players))),
+          Positioned(top: 0, child: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.gold, size: diameter * .15)),
+          Material(color: Colors.transparent, child: InkWell(onTap: _isSpinning ? null : () => _spinWheel(activePool), customBorder: const CircleBorder(), child: Container(width: diameter * .24, height: diameter * .24, decoration: BoxDecoration(shape: BoxShape.circle, gradient: const LinearGradient(colors: [AppColors.neonPink, AppColors.neonPurple]), border: Border.all(color: Colors.white.withOpacity(.55), width: 3), boxShadow: [BoxShadow(color: AppColors.neonPink.withOpacity(.4), blurRadius: 20)]), child: Center(child: Text(_isSpinning ? '…' : 'SPIN', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1))))))
+        ])),
+        const SizedBox(height: 18),
+        Text(_isSpinning ? 'Picking your player…' : 'Tap the wheel or button to pick', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+        const SizedBox(height: 16),
+        SizedBox(width: math.min(280, constraints.maxWidth), child: ElevatedButton.icon(onPressed: _isSpinning ? null : () => _spinWheel(activePool), icon: Icon(_isSpinning ? Icons.hourglass_top_rounded : Icons.casino_rounded), label: Text(_isSpinning ? 'SPINNING…' : 'SPIN THE WHEEL'))),
+      ]);
+    });
   }
 }
 
 class _WheelPainter extends CustomPainter {
   final List<Player> players;
   _WheelPainter({required this.players});
+  static const colors = [Color(0xFF513B82), Color(0xFF315A82), Color(0xFF743A67), Color(0xFF245F62), Color(0xFF79503D), Color(0xFF453D78)];
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double radius = size.width / 2;
-    final Offset center = Offset(radius, radius);
-    final Rect rect = Rect.fromCircle(center: center, radius: radius);
-    final double sliceAngle = (2 * math.pi) / players.length;
-
-    final List<Color> sliceColors = [
-      const Color(0xFF0080FF),
-      const Color(0xFFFF0080),
-      const Color(0xFF7B1FA2),
-      const Color(0xFF00796B),
-      const Color(0xFFC2185B),
-      const Color(0xFF303F9F),
-    ];
-
-    // Align start angle at top (-pi/2)
-    final double startAngleOffset = -math.pi / 2;
-
-    for (int i = 0; i < players.length; i++) {
-      final Paint paint = Paint()
-        ..style = PaintingStyle.fill
-        ..color = sliceColors[i % sliceColors.length];
-
-      final double sliceStart = startAngleOffset + (i * sliceAngle);
-      canvas.drawArc(rect, sliceStart, sliceAngle, true, paint);
-
+    if (players.isEmpty) return;
+    final radius = size.width / 2;
+    final center = Offset(radius, radius);
+    final rect = Rect.fromCircle(center: center, radius: radius - 5);
+    final sliceAngle = 2 * math.pi / players.length;
+    const offset = -math.pi / 2;
+    final separator = Paint()..color = const Color(0xFF171421)..style = PaintingStyle.stroke..strokeWidth = 3;
+    for (var i = 0; i < players.length; i++) {
+      final start = offset + i * sliceAngle;
+      final fill = Paint()..shader = RadialGradient(colors: [colors[i % colors.length].withOpacity(.82), colors[i % colors.length]]).createShader(rect);
+      canvas.drawArc(rect, start, sliceAngle, true, fill);
+      canvas.drawArc(rect, start, sliceAngle, true, separator);
       canvas.save();
       canvas.translate(center.dx, center.dy);
-      canvas.rotate(sliceStart + sliceAngle / 2);
-
-      final TextPainter tp = TextPainter(
-        text: TextSpan(
-          text: players[i].name,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-
-      tp.layout();
-      tp.paint(canvas, Offset(radius * 0.55, -tp.height / 2));
+      canvas.rotate(start + sliceAngle / 2);
+      final text = players[i].name;
+      final tp = TextPainter(text: TextSpan(text: text, style: TextStyle(color: Colors.white, fontSize: math.min(14.0, radius / math.max(6, players.length)), fontWeight: FontWeight.w800, shadows: const [Shadow(color: Colors.black87, blurRadius: 5)])), textDirection: TextDirection.ltr, maxLines: 1, ellipsis: '…');
+      tp.layout(maxWidth: radius * .55);
+      tp.paint(canvas, Offset(radius * .35, -tp.height / 2));
       canvas.restore();
     }
+    canvas.drawCircle(center, radius - 5, Paint()..color = AppColors.gold.withOpacity(.8)..style = PaintingStyle.stroke..strokeWidth = 2);
+    canvas.drawCircle(center, radius * .20, Paint()..color = Colors.white.withOpacity(.09)..style = PaintingStyle.stroke..strokeWidth = 1);
   }
-
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
-class _TrianglePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = Colors.amber
-      ..style = PaintingStyle.fill;
-
-    final Path path = Path()
-      ..moveTo(size.width / 2, size.height)
-      ..lineTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _WheelPainter oldDelegate) => oldDelegate.players != players;
 }
