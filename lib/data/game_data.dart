@@ -22,8 +22,10 @@ class GameData {
     }
   }
 
-  /// Returns unmodified templates so runtime question processing can replace
-  /// every token using the selected player and current roster.
+  static String _normalizeKey(String key) {
+    return key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
   static List<String> getQuestions(
     String lang,
     String category,
@@ -35,36 +37,43 @@ class GameData {
       return _getFallbackQuestions(type);
     }
 
+    final normalizedTargetCat = _normalizeKey(category);
+
     String? matchedCategoryKey;
     for (final dynamic rawKey in langData.keys) {
       final key = rawKey.toString();
-      if (key.toLowerCase().contains(category.toLowerCase()) ||
-          category.toLowerCase().contains(key.toLowerCase())) {
+      final normalizedKey = _normalizeKey(key);
+      if (normalizedKey == normalizedTargetCat ||
+          normalizedKey.contains(normalizedTargetCat) ||
+          normalizedTargetCat.contains(normalizedKey)) {
         matchedCategoryKey = key;
         break;
       }
     }
 
     if (matchedCategoryKey == null) {
-      print("DEBUG: Category '$category' not found in lang '$lang'. Available: ${langData.keys}");
+      print("DEBUG: Category '$category' not found in lang '$lang'. Available keys: ${langData.keys}");
       return _getFallbackQuestions(type);
     }
 
     final categoryData = langData[matchedCategoryKey];
     if (categoryData is! Map) return _getFallbackQuestions(type);
 
+    final normalizedTargetType = _normalizeKey(type);
     String? matchedTypeKey;
     for (final dynamic rawKey in categoryData.keys) {
       final key = rawKey.toString();
-      if (key.toLowerCase().contains(type.toLowerCase()) ||
-          type.toLowerCase().contains(key.toLowerCase())) {
+      final normalizedKey = _normalizeKey(key);
+      if (normalizedKey == normalizedTargetType ||
+          normalizedKey.contains(normalizedTargetType) ||
+          normalizedTargetType.contains(normalizedKey)) {
         matchedTypeKey = key;
         break;
       }
     }
 
     if (matchedTypeKey == null) {
-      print("DEBUG: Type '$type' not found under category '$matchedCategoryKey'. Available: ${categoryData.keys}");
+      print("DEBUG: Type '$type' not found under category '$matchedCategoryKey'. Available subkeys: ${categoryData.keys}");
       return _getFallbackQuestions(type);
     }
 
@@ -73,7 +82,6 @@ class GameData {
     return rawList.map((question) => question.toString()).toList();
   }
 
-  /// Emergency templates still use the same runtime placeholder pipeline.
   static List<String> _getFallbackQuestions(String type) {
     if (type.toLowerCase().contains('truth')) {
       return [
