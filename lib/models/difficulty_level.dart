@@ -14,7 +14,23 @@ extension DifficultyLevelExtension on DifficultyLevel {
       case DifficultyLevel.extreme:
         return 'Extreme';
       case DifficultyLevel.couple:
-        return 'Couple Mode';
+        return 'Couples Mode';
+    }
+  }
+
+  /// Raw database key matching JSON locales ('couples')
+  String get apiKey {
+    switch (this) {
+      case DifficultyLevel.vanilla:
+        return 'vanilla';
+      case DifficultyLevel.playful:
+        return 'playful';
+      case DifficultyLevel.wild:
+        return 'wild';
+      case DifficultyLevel.extreme:
+        return 'extreme';
+      case DifficultyLevel.couple:
+        return 'couples';
     }
   }
 
@@ -38,7 +54,9 @@ extension DifficultyLevelExtension on DifficultyLevel {
   static DifficultyLevel fromString(String v) {
     final lower = v.toLowerCase().replaceAll(' ', '');
     for (var e in DifficultyLevel.values) {
-      if (e.displayName.toLowerCase().replaceAll(' ', '') == lower) {
+      final nameLower = e.displayName.toLowerCase().replaceAll(' ', '');
+      final keyLower = e.apiKey.toLowerCase();
+      if (nameLower == lower || keyLower == lower || lower.contains('couple')) {
         return e;
       }
     }
