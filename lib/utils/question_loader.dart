@@ -8,15 +8,14 @@ class QuestionLoader {
   static final Map<Player, String> _lastChoices = {};
   static final Map<Player, Player> _partners = {};
   static final Random _random = Random();
+  
+  // Session tracking to ensure questions never repeat until the app is closed
+  static final Set<String> _usedQuestionTexts = {};
 
-  /// Registers a preferred partner. Runtime matching still validates that the
-  /// partner is another player and prefers an opposite-gender match.
   static void assignPartner(Player player, Player partner) {
     _partners[player] = partner;
   }
 
-  /// Loads raw question templates. Names are substituted at the moment a
-  /// question is shown, when the active player and full roster are available.
   static Future<List<Question>> loadQuestions(
     String langKey, {
     String category = 'vanilla',
@@ -28,7 +27,6 @@ class QuestionLoader {
     final chosenType = type.toLowerCase();
     final chosenCategory = category.toLowerCase();
 
-    // Preserve the existing rule for callers that load questions for a player.
     if (currentPlayer != null) {
       final previousChoice = _lastChoices[currentPlayer];
       if (chosenType == 'truth' && previousChoice == 'truth') {
@@ -45,10 +43,24 @@ class QuestionLoader {
       chosenType,
     );
 
-    return List<Question>.generate(rawStrings.length, (index) {
+    // Filter out questions already served in this session
+    var availableStrings = rawStrings.where((q) => !_usedQuestionTexts.contains(q)).toList();
+
+    // If all questions have been exhausted in this session, reset tracker to loop fresh
+    if (availableStrings.isEmpty) {
+      _usedQuestionTexts.clear();
+      availableStrings = List.from(rawStrings);
+    }
+
+    // Mark selected questions as used for the rest of the app session
+    for (var q in availableStrings) {
+      _usedQuestionTexts.add(q);
+    }
+
+    return List<Question>.generate(availableStrings.length, (index) {
       return Question(
         id: 'q_${index + 1}',
-        text: rawStrings[index],
+        text: availableStrings[index],
         type: chosenType,
         category: chosenCategory,
       );
@@ -117,10 +129,6 @@ class QuestionLoader {
     return _chooseRandom(candidates)?.name ?? fallback;
   }
 
-  /// Replaces all supported question tokens using players from the current
-  /// round. `{partner}` and `{target}` share the opposite-gender-preferred
-  /// target; if no opposite-gender player is available, any other player is
-  /// eligible. Gender-specific tokens fall back to that target when needed.
   static String processQuestionText(
     String text, [
     Player? currentPlayer,
@@ -129,35 +137,21 @@ class QuestionLoader {
     final players = otherPlayerOrPlayers is List<Player>
         ? otherPlayerOrPlayers
         : <Player>[];
+    
     final playerName = currentPlayer?.name ?? 'Player';
-    final others = _otherPlayers(currentPlayer, players);
-    final explicitOtherPlayer = otherPlayerOrPlayers is String
-        ? otherPlayerOrPlayers
-        : null;
-    final otherPlayerName = explicitOtherPlayer ?? _chooseRandom(others)?.name ?? 'someone';
-    final target = _chooseTarget(currentPlayer, players);
-    final targetName = target?.name ?? explicitOtherPlayer ?? 'someone';
-    final partnerName = targetName;
-    final maleName = _chooseGenderName(
-      'male',
-      currentPlayer,
-      players,
-      fallback: targetName,
-    );
-    final femaleName = _chooseGenderName(
-      'female',
-      currentPlayer,
-      players,
-      fallback: targetName,
-    );
+    final targetPlayer = _chooseTarget(currentPlayer, players);
+    final partnerName = targetPlayer?.name ?? 'Someone';
+    final otherPlayer = targetPlayer?.name ?? 'Someone';
+
+    final maleName = _chooseGenderName('male', currentPlayer, players, fallback: otherPlayer);
+    final femaleName = _chooseGenderName('female', currentPlayer, players, fallback: otherPlayer);
 
     return text
         .replaceAll('{name}', playerName)
-        .replaceAll('{player}', playerName)
         .replaceAll('{partner}', partnerName)
-        .replaceAll('{target}', targetName)
-        .replaceAll('{other_player}', otherPlayerName)
-        .replaceAll('{other_male}', maleName)
-        .replaceAll('{other_female}', femaleName);
+        .replaceAll('{target}', otherPlayer)
+        .replaceAll('{other_player}', otherPlayer)
+        .replaceAll('{male_player}', maleName)
+        .replaceAll('{female_player}', femaleName);
   }
 }
