@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/player.dart';
 import '../models/question.dart';
+import '../models/game_rules.dart'; // Ensure you have your GameRules imported if separate
 import '../utils/question_loader.dart';
 import '../services/audio_service.dart';
 import '../theme/app_background.dart';
 import '../theme/app_theme.dart';
+import '../widgets/player_spinner.dart';
 
 class GameScreen extends StatefulWidget {
   final List<Player> players;
@@ -22,10 +24,10 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
-  int _currentPlayerIndex = 0;
+  Player? _currentPlayer;
   Question? _currentQuestion;
   String _activeType = '';
-  bool _isRevealed = false;
+  bool _isTurnActive = false;
 
   // Timer state variables (30s total: 10s reading, 20s action)
   Timer? _dareTimer;
@@ -56,8 +58,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  Player get _currentPlayer => widget.players[_currentPlayerIndex];
-
   void _startDareTimer() {
     _dareTimer?.cancel();
     setState(() {
@@ -78,6 +78,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         AudioService.playClick();
       }
     });
+  }
+
+  void _onPlayerSelected(Player selectedPlayer) {
+    AudioService.playClick();
+    setState(() {
+      _currentPlayer = selectedPlayer;
+      _isTurnActive = true;
+      _currentQuestion = null;
+      _activeType = '';
+      _isTimerActive = false;
+    });
+    _cardController.forward(from: 0.0);
   }
 
   void _selectType(String type) {
@@ -109,24 +121,38 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         text: processedText,
         category: rawQuestion.category,
       );
-      _isRevealed = true;
       _isTimerActive = false;
     });
 
     _cardController.forward(from: 0.0);
 
-    // If it's a dare, start the 30-second countdown (10s read + 20s action)
     if (type.toLowerCase() == 'dare') {
       _startDareTimer();
     }
   }
 
-  void _nextPlayer() {
+  void _recordChallengeResult(bool completed) {
     AudioService.playClick();
     _dareTimer?.cancel();
+
+    if (_currentPlayer != null) {
+      // Apply scoring rules (+10 on completion, -5 on failure/skip)
+      final delta = completed ? 10 : -5;
+      _currentPlayer!.score = (_currentPlayer!.score + delta).clamp(0, 0x7fffffff);
+      _currentPlayer!.hasCompletedTurn = true;
+    }
+
+    // Check if round cycle is complete
+    final allDone = widget.players.every((p) => p.hasCompletedTurn);
+    if (allDone) {
+      for (var p in widget.players) {
+        p.hasCompletedTurn = false;
+      }
+    }
+
     setState(() {
-      _currentPlayerIndex = (_currentPlayerIndex + 1) % widget.players.length;
-      _isRevealed = false;
+      _currentPlayer = null;
+      _isTurnActive = false;
       _currentQuestion = null;
       _activeType = '';
       _isTimerActive = false;
@@ -134,13 +160,102 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _cardController.forward(from: 0.0);
   }
 
+  void _showLeaderboard() {
+    AudioService.playClick();
+    final sortedPlayers = List<Player>.from(widget.players)
+      ..sort((a, b) => b.score.compareTo(a.score));
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF140A1F),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: AppColors.neonPink.withOpacity(0.4), width: 1.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.leaderboard_rounded, color: AppColors.neonPink),
+            SizedBox(width: 10),
+            Text(
+              'SCOREBOARD',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: sortedPlayers.length,
+            itemBuilder: (context, index) {
+              final player = sortedPlayers[index];
+              final isLeader = index == 0;
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isLeader ? AppColors.neonPink.withOpacity(0.15) : Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isLeader ? AppColors.neonPink : Colors.white12,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      '#${index + 1}',
+                      style: TextStyle(
+                        color: isLeader ? AppColors.neonPink : AppColors.muted,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        player.name,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    Text(
+                      '${player.score} PTS',
+                      style: TextStyle(
+                        color: isLeader ? AppColors.neonPink : AppColors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CLOSE', style: TextStyle(color: AppColors.neonPink, fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final playerAccent = _currentPlayer.gender.toLowerCase() == 'male' ? AppColors.neonBlue : AppColors.neonPink;
+    final playerAccent = _currentPlayer != null && _currentPlayer!.gender.toLowerCase() == 'male' 
+        ? AppColors.neonBlue 
+        : AppColors.neonPink;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${_currentPlayer.name.toUpperCase()}\'S TURN'),
+        title: Text(_currentPlayer == null ? 'SPIN FOR YOUR FATE' : '${_currentPlayer!.name.toUpperCase()}\'S TURN'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.leaderboard_rounded, color: AppColors.neonPink),
+            tooltip: 'View Leaderboard',
+            onPressed: _showLeaderboard,
+          ),
+        ],
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () {
@@ -156,45 +271,44 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Top Info Bar
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: playerAccent.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: playerAccent.withOpacity(0.4)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.person_rounded, size: 16, color: playerAccent),
-                          const SizedBox(width: 6),
-                          Text(
-                            _currentPlayer.name,
-                            style: TextStyle(
-                              color: playerAccent,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12,
+                if (_currentPlayer != null)
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: playerAccent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: playerAccent.withOpacity(0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.person_rounded, size: 16, color: playerAccent),
+                            const SizedBox(width: 6),
+                            Text(
+                              _currentPlayer!.name,
+                              style: TextStyle(
+                                color: playerAccent,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'Score: ${_currentPlayer.score}',
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
+                      const Spacer(),
+                      Text(
+                        'Score: ${_currentPlayer!.score}',
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
                 const Spacer(),
 
-                // Central Dynamic Card Container
                 ScaleTransition(
                   scale: _scaleAnimation,
                   child: AnimatedSwitcher(
@@ -209,28 +323,61 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         child: child,
                       ),
                     ),
-                    child: _isRevealed && _currentQuestion != null
-                        ? _buildChallengeCard()
-                        : _buildChoiceSelectorCard(),
+                    child: !_isTurnStatusActive()
+                        ? PlayerSpinner(
+                            players: widget.players,
+                            onPlayerSelected: _onPlayerSelected,
+                          )
+                        : (_currentQuestion == null
+                            ? _buildChoiceSelectorCard()
+                            : _buildChallengeCard()),
                   ),
                 ),
 
                 const Spacer(),
 
-                // Bottom Action Button Controls
-                if (_isRevealed)
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.neonPink,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    onPressed: _nextPlayer,
-                    icon: const Icon(Icons.arrow_forward_rounded, color: Colors.white),
-                    label: const Text(
-                      'NEXT PLAYER',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white),
-                    ),
+                // Outcome Action Buttons (Completed vs Failed)
+                if (_currentQuestion != null)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 52,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.neonRed.withOpacity(0.2),
+                              side: const BorderSide(color: AppColors.neonRed, width: 1.5),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: () => _recordChallengeResult(false),
+                            icon: const Icon(Icons.close_rounded, color: AppColors.neonRed),
+                            label: const Text(
+                              'FAILED (-5)',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.neonRed),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: SizedBox(
+                          height: 52,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.neonGreen.withOpacity(0.2),
+                              side: const BorderSide(color: AppColors.neonGreen, width: 1.5),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            onPressed: () => _recordChallengeResult(true),
+                            icon: const Icon(Icons.check_rounded, color: AppColors.neonGreen),
+                            label: const Text(
+                              'COMPLETED (+10)',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.neonGreen),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 const SizedBox(height: 12),
               ],
@@ -239,6 +386,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         ),
       ),
     );
+  }
+
+  bool _isTurnStatusActive() {
+    return _isTurnActive && _currentPlayer != null;
   }
 
   Widget _buildChoiceSelectorCard() {
@@ -258,9 +409,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Truth or Dare? Choose wisely.',
-            style: TextStyle(color: AppColors.muted, fontSize: 13),
+          Text(
+            '${_currentPlayer?.name ?? "Player"}, truth or dare?',
+            style: const TextStyle(color: AppColors.muted, fontSize: 13),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 28),
@@ -312,7 +463,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final isTruth = _activeType.toLowerCase() == 'truth';
     final accentColor = isTruth ? AppColors.neonBlue : AppColors.neonPink;
 
-    // Determine timer phase label for dares (10s read, 20s action)
     String timerStatusText = '';
     if (!isTruth && _isTimerActive) {
       if (_remainingSeconds > 20) {
