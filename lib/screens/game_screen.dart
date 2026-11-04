@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/player.dart';
 import '../models/question.dart';
@@ -20,11 +21,16 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateMixin {
+class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   int _currentPlayerIndex = 0;
   Question? _currentQuestion;
   String _activeType = '';
   bool _isRevealed = false;
+
+  // Timer state variables (30s total: 10s reading, 20s action)
+  Timer? _dareTimer;
+  int _remainingSeconds = 30;
+  bool _isTimerActive = false;
 
   late AnimationController _cardController;
   late Animation<double> _scaleAnimation;
@@ -45,16 +51,39 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    _dareTimer?.cancel();
     _cardController.dispose();
     super.dispose();
   }
 
   Player get _currentPlayer => widget.players[_currentPlayerIndex];
 
+  void _startDareTimer() {
+    _dareTimer?.cancel();
+    setState(() {
+      _remainingSeconds = 30;
+      _isTimerActive = true;
+    });
+
+    _dareTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingSeconds > 0) {
+        setState(() {
+          _remainingSeconds--;
+        });
+      } else {
+        timer.cancel();
+        setState(() {
+          _isTimerActive = false;
+        });
+        AudioService.playClick();
+      }
+    });
+  }
+
   void _selectType(String type) {
     AudioService.playClick();
-    
-    // Filter questions matching chosen type (truth/dare)
+    _dareTimer?.cancel();
+
     final available = widget.questions.where((q) => q.type.toLowerCase() == type.toLowerCase()).toList();
     if (available.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -66,7 +95,6 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     available.shuffle();
     final rawQuestion = available.first;
     
-    // Process template tokens ({name}, {partner}, etc.)
     final processedText = QuestionLoader.processQuestionText(
       rawQuestion.text,
       _currentPlayer,
@@ -82,18 +110,26 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
         category: rawQuestion.category,
       );
       _isRevealed = true;
+      _isTimerActive = false;
     });
 
     _cardController.forward(from: 0.0);
+
+    // If it's a dare, start the 30-second countdown (10s read + 20s action)
+    if (type.toLowerCase() == 'dare') {
+      _startDareTimer();
+    }
   }
 
   void _nextPlayer() {
     AudioService.playClick();
+    _dareTimer?.cancel();
     setState(() {
       _currentPlayerIndex = (_currentPlayerIndex + 1) % widget.players.length;
       _isRevealed = false;
       _currentQuestion = null;
       _activeType = '';
+      _isTimerActive = false;
     });
     _cardController.forward(from: 0.0);
   }
@@ -107,7 +143,10 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
         title: Text('${_currentPlayer.name.toUpperCase()}\'S TURN'),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            _dareTimer?.cancel();
+            Navigator.pop(context);
+          },
         ),
       ),
       body: AppBackground(
@@ -117,7 +156,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Top Info Bar / Score Row
+                // Top Info Bar
                 Row(
                   children: [
                     Container(
@@ -155,7 +194,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                 ),
                 const Spacer(),
 
-                // Central Dynamic Card Container with Scale & Fade Animation
+                // Central Dynamic Card Container
                 ScaleTransition(
                   scale: _scaleAnimation,
                   child: AnimatedSwitcher(
@@ -273,6 +312,18 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     final isTruth = _activeType.toLowerCase() == 'truth';
     final accentColor = isTruth ? AppColors.neonBlue : AppColors.neonPink;
 
+    // Determine timer phase label for dares (10s read, 20s action)
+    String timerStatusText = '';
+    if (!isTruth && _isTimerActive) {
+      if (_remainingSeconds > 20) {
+        timerStatusText = '📖 READING & PREPARING (${_remainingSeconds - 20}s)';
+      } else {
+        timerStatusText = '⚡ ACTION TIME! (${_remainingSeconds}s remaining)';
+      }
+    } else if (!isTruth && !_isTimerActive && _remainingSeconds == 0) {
+      timerStatusText = '⏰ TIME IS UP!';
+    }
+
     return AppGlassPanel(
       key: const ValueKey('challenge'),
       accent: accentColor,
@@ -307,7 +358,37 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 24),
+          if (!isTruth) ...[
+            const SizedBox(height: 24),
+            const Divider(color: Colors.white24, height: 1),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    value: _remainingSeconds / 30.0,
+                    strokeWidth: 3,
+                    color: accentColor,
+                    backgroundColor: Colors.white12,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  timerStatusText,
+                  style: TextStyle(
+                    color: _remainingSeconds <= 5 && _isTimerActive ? AppColors.neonRed : accentColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
         ],
       ),
     );
