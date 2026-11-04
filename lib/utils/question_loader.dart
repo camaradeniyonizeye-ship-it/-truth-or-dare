@@ -84,36 +84,48 @@ class QuestionLoader {
     return candidates[_random.nextInt(candidates.length)];
   }
 
+  /// STRICT OPPOSITE-GENDER PAIRING
+  /// Strictly searches for players of the opposite gender first.
+  /// Only falls back to same-gender if no opposite-gender players exist in the room.
   static Player? _chooseTarget(Player? currentPlayer, List<Player> players) {
     final others = _otherPlayers(currentPlayer, players);
     if (others.isEmpty) return null;
 
-    final assigned = currentPlayer == null ? null : _partners[currentPlayer];
-    final validAssigned = assigned != null &&
-        others.any((player) => player.id == assigned.id);
-
     if (currentPlayer != null) {
-      final gender = currentPlayer.gender.toLowerCase();
-      final oppositeGender = gender == 'male'
-          ? 'female'
-          : gender == 'female'
-              ? 'male'
-              : null;
+      final currentGender = currentPlayer.gender.trim().toLowerCase();
+      
+      // Determine required target gender
+      String targetGender = '';
+      if (currentGender == 'male') {
+        targetGender = 'female';
+      } else if (currentGender == 'female') {
+        targetGender = 'male';
+      }
 
-      if (oppositeGender != null) {
-        final oppositePlayers = others
-            .where((player) => player.gender.toLowerCase() == oppositeGender)
-            .toList();
-        if (oppositePlayers.isNotEmpty) {
-          if (validAssigned && assigned!.gender.toLowerCase() == oppositeGender) {
+      if (targetGender.isNotEmpty) {
+        // Filter strictly for opposite gender
+        final oppositeGenderPlayers = others.where(
+          (p) => p.gender.trim().toLowerCase() == targetGender,
+        ).toList();
+
+        if (oppositeGenderPlayers.isNotEmpty) {
+          // Check if an assigned partner matches the opposite gender rule
+          final assigned = _partners[currentPlayer];
+          if (assigned != null && 
+              oppositeGenderPlayers.any((p) => p.id == assigned.id)) {
             return assigned;
           }
-          return _chooseRandom(oppositePlayers);
+          return _chooseRandom(oppositeGenderPlayers);
         }
       }
     }
 
-    if (validAssigned) return assigned;
+    // Fallback: If room is single-gender, pick any available other player
+    final assigned = currentPlayer == null ? null : _partners[currentPlayer];
+    if (assigned != null && others.any((p) => p.id == assigned.id)) {
+      return assigned;
+    }
+
     return _chooseRandom(others);
   }
 
@@ -124,7 +136,7 @@ class QuestionLoader {
     required String fallback,
   }) {
     final candidates = _otherPlayers(currentPlayer, players)
-        .where((player) => player.gender.toLowerCase() == gender)
+        .where((player) => player.gender.trim().toLowerCase() == gender.toLowerCase())
         .toList();
     return _chooseRandom(candidates)?.name ?? fallback;
   }
