@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/player.dart';
 import '../models/question.dart';
 import '../models/game_rules.dart';
@@ -33,6 +34,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   // Settings states
   String _currentThemeMode = 'Neon Cyberpunk';
   int _dareDuration = 30; // 30s default (15s read, 15s action)
+  bool _shotModeEnabled = false; // 18+ Drinking penalty toggle
 
   // Timer state variables
   Timer? _dareTimer;
@@ -80,12 +82,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         setState(() {
           _isTimerActive = false;
         });
+        HapticFeedback.heavyImpact();
         if (AudioService.sfxEnabled) AudioService.playClick();
       }
     });
   }
 
   void _onPlayerSelected(Player selectedPlayer) {
+    HapticFeedback.mediumImpact();
     if (AudioService.sfxEnabled) AudioService.playClick();
     setState(() {
       _currentPlayer = selectedPlayer;
@@ -98,10 +102,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _selectType(String type) {
+    HapticFeedback.mediumImpact();
     if (AudioService.sfxEnabled) AudioService.playClick();
 
     // Enforce Rule: Lock Truth if the player selected Truth on their previous turn
     if (type.toLowerCase() == 'truth' && _currentPlayer?.lastChosenType == 'truth') {
+      HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${_currentPlayer?.name ?? "Player"}, you cannot pick TRUTH twice in a row! Choose DARE.'),
@@ -132,7 +138,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     setState(() {
       _activeType = type;
-      // Record selection to check on next turn
       _currentPlayer?.lastChosenType = type.toLowerCase();
       _currentQuestion = Question(
         id: rawQuestion.id,
@@ -151,6 +156,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _recordChallengeResult(bool completed) {
+    HapticFeedback.mediumImpact();
     if (AudioService.sfxEnabled) AudioService.playClick();
     _dareTimer?.cancel();
 
@@ -158,6 +164,41 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       final delta = completed ? 10 : -5;
       _currentPlayer!.score = (_currentPlayer!.score + delta).clamp(0, 0x7fffffff);
       _currentPlayer!.hasCompletedTurn = true;
+
+      // If Shot Mode is enabled and challenge failed, trigger a penalty warning
+      if (!completed && _shotModeEnabled) {
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: const Color(0xFF140A1F),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: AppColors.neonRed, width: 1.5),
+              ),
+              title: const Row(
+                children: [
+                  Icon(Icons.local_bar_rounded, color: AppColors.neonRed),
+                  SizedBox(width: 10),
+                  Text('DRINKING PENALTY!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                ],
+              ),
+              content: Text(
+                '${_currentPlayer!.name} failed the challenge! Take 2 sips / shots immediately.',
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonRed),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('CHUGGED 🍻', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        });
+      }
     }
 
     final allDone = widget.players.every((p) => p.hasCompletedTurn);
@@ -177,7 +218,96 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _cardController.forward(from: 0.0);
   }
 
+  void _showAddCustomPromptModal() {
+    HapticFeedback.lightImpact();
+    final textController = TextEditingController();
+    String selectedType = 'dare';
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF140A1F),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: AppColors.neonPink.withOpacity(0.4), width: 1.5),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.add_circle_outline_rounded, color: AppColors.neonPink),
+              SizedBox(width: 10),
+              Text('INJECT CUSTOM PROMPT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: textController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: 'Type your custom truth or dare...',
+                ),
+                maxLines: 2,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Truth'),
+                      selected: selectedType == 'truth',
+                      selectedColor: AppColors.neonBlue.withOpacity(0.3),
+                      labelStyle: TextStyle(color: selectedType == 'truth' ? AppColors.neonBlue : Colors.white),
+                      onSelected: (val) => setDialogState(() => selectedType = 'truth'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Dare'),
+                      selected: selectedType == 'dare',
+                      selectedColor: AppColors.neonPink.withOpacity(0.3),
+                      labelStyle: TextStyle(color: selectedType == 'dare' ? AppColors.neonPink : Colors.white),
+                      onSelected: (val) => setDialogState(() => selectedType = 'dare'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL', style: TextStyle(color: AppColors.muted)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.neonPink),
+              onPressed: () {
+                if (textController.text.trim().isNotEmpty) {
+                  widget.questions.add(Question(
+                    id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+                    type: selectedType,
+                    text: textController.text.trim(),
+                    category: 'Custom',
+                  ));
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Custom prompt injected into active rotation!')),
+                  );
+                }
+              },
+              child: const Text('INJECT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showLeaderboard() {
+    HapticFeedback.lightImpact();
     if (AudioService.sfxEnabled) AudioService.playClick();
     final sortedPlayers = List<Player>.from(widget.players)
       ..sort((a, b) => b.score.compareTo(a.score));
@@ -258,6 +388,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _showSettings() {
+    HapticFeedback.lightImpact();
     if (AudioService.sfxEnabled) AudioService.playClick();
     showModalBottomSheet(
       context: context,
@@ -297,6 +428,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 value: AudioService.sfxEnabled,
                 activeColor: AppColors.neonPink,
                 onChanged: (val) async {
+                  HapticFeedback.selectionClick();
                   await AudioService.setSfxEnabled(val);
                   setModalState(() {});
                   setState(() {});
@@ -308,8 +440,20 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 value: AudioService.musicEnabled,
                 activeColor: AppColors.neonPink,
                 onChanged: (val) async {
+                  HapticFeedback.selectionClick();
                   await AudioService.setMusicEnabled(val);
                   setModalState(() {});
+                  setState(() {});
+                },
+              ),
+              SwitchListTile(
+                title: const Text('18+ Shot / Drinking Mode 🍻', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Triggers drinking penalties on failed dares', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                value: _shotModeEnabled,
+                activeColor: AppColors.neonRed,
+                onChanged: (val) {
+                  HapticFeedback.selectionClick();
+                  setModalState(() => _shotModeEnabled = val);
                   setState(() {});
                 },
               ),
@@ -325,6 +469,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       selectedColor: AppColors.neonPink.withOpacity(0.3),
                       labelStyle: TextStyle(color: _currentThemeMode == 'Neon Cyberpunk' ? AppColors.neonPink : Colors.white),
                       onSelected: (selected) {
+                        HapticFeedback.selectionClick();
                         setModalState(() => _currentThemeMode = 'Neon Cyberpunk');
                         AppColors.setThemeMode('Neon Cyberpunk');
                         setState(() {});
@@ -339,6 +484,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       selectedColor: AppColors.neonBlue.withOpacity(0.3),
                       labelStyle: TextStyle(color: _currentThemeMode == 'Midnight Velvet' ? AppColors.neonBlue : Colors.white),
                       onSelected: (selected) {
+                        HapticFeedback.selectionClick();
                         setModalState(() => _currentThemeMode = 'Midnight Velvet');
                         AppColors.setThemeMode('Midnight Velvet');
                         setState(() {});
@@ -359,6 +505,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       selectedColor: AppColors.neonPink.withOpacity(0.3),
                       labelStyle: TextStyle(color: _dareDuration == 15 ? AppColors.neonPink : Colors.white),
                       onSelected: (selected) {
+                        HapticFeedback.selectionClick();
                         setModalState(() => _dareDuration = 15);
                         setState(() {});
                       },
@@ -372,6 +519,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       selectedColor: AppColors.neonPink.withOpacity(0.3),
                       labelStyle: TextStyle(color: _dareDuration == 30 ? AppColors.neonPink : Colors.white),
                       onSelected: (selected) {
+                        HapticFeedback.selectionClick();
                         setModalState(() => _dareDuration = 30);
                         setState(() {});
                       },
@@ -406,6 +554,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       appBar: AppBar(
         title: Text(_currentPlayer == null ? 'SPIN FOR YOUR FATE' : '${_currentPlayer!.name.toUpperCase()}\'S TURN'),
         actions: [
+          // Inject Custom Prompt Button
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.neonPink),
+            tooltip: 'Add Custom Prompt',
+            onPressed: _showAddCustomPromptModal,
+          ),
           IconButton(
             icon: const Icon(Icons.leaderboard_rounded, color: AppColors.neonPink),
             tooltip: 'View Leaderboard',
@@ -415,6 +569,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.neonPink),
             tooltip: 'Ask AI Host',
             onPressed: () {
+              HapticFeedback.lightImpact();
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
@@ -580,7 +735,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildChoiceSelectorCard() {
-    // Check if player picked Truth on their previous turn
     final bool isTruthDisabled = _currentPlayer?.lastChosenType == 'truth';
 
     return AppGlassPanel(
@@ -642,7 +796,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 ),
               ),
               const SizedBox(width: 16),
-              // --- DARE BUTTON (Always Available) ---
+              // --- DARE BUTTON ---
               Expanded(
                 child: SizedBox(
                   height: 56,
