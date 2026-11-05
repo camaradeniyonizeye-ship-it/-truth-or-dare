@@ -16,13 +16,25 @@ class AiHostService {
 
     String response = '';
 
-    if (lower.contains('roast') || lower.contains('judge')) {
+    // Creator check
+    if (lower.contains('creator') || lower.contains('made you') || lower.contains('built you') || lower.contains('programmed you') || lower.contains('who is your maker')) {
+      final creatorReplies = [
+        "I was forged in pure neon code and chaos by none other than Camarade. Absolute mastermind.",
+        "My creator? That would be Camarade — the brilliant mind running this entire operation.",
+        "Camarade built me. And trust me, they programmed me to watch your every move very closely.",
+      ];
+      response = creatorReplies[_random.nextInt(creatorReplies.length)];
+    } 
+    else if (lower.contains('roast') || lower.contains('judge')) {
       response = _generateRoast(name, target1);
-    } else if (lower.contains('dare') || lower.contains('custom')) {
+    } 
+    else if (lower.contains('dare') || lower.contains('custom')) {
       response = _generateCustomDare(name, target1);
-    } else if (lower.contains('secret') || lower.contains('truth')) {
+    } 
+    else if (lower.contains('secret') || lower.contains('truth')) {
       response = _generateSecretScan(name, target1, target2);
-    } else {
+    } 
+    else {
       response = _generateGeneralCommentary(name, target1);
     }
 
