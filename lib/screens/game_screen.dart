@@ -99,6 +99,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   void _selectType(String type) {
     if (AudioService.sfxEnabled) AudioService.playClick();
+
+    // Enforce Rule: Lock Truth if the player selected Truth on their previous turn
+    if (type.toLowerCase() == 'truth' && _currentPlayer?.lastChosenType == 'truth') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${_currentPlayer?.name ?? "Player"}, you cannot pick TRUTH twice in a row! Choose DARE.'),
+          backgroundColor: AppColors.neonRed,
+        ),
+      );
+      return;
+    }
+
     _dareTimer?.cancel();
 
     final available = widget.questions.where((q) => q.type.toLowerCase() == type.toLowerCase()).toList();
@@ -120,6 +132,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     setState(() {
       _activeType = type;
+      // Record selection to check on next turn
+      _currentPlayer?.lastChosenType = type.toLowerCase();
       _currentQuestion = Question(
         id: rawQuestion.id,
         type: rawQuestion.type,
@@ -566,6 +580,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildChoiceSelectorCard() {
+    // Check if player picked Truth on their previous turn
+    final bool isTruthDisabled = _currentPlayer?.lastChosenType == 'truth';
+
     return AppGlassPanel(
       key: const ValueKey('selector'),
       padding: const EdgeInsets.all(24),
@@ -583,31 +600,49 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 8),
           Text(
-            '${_currentPlayer?.name ?? "Player"}, truth or dare?',
-            style: const TextStyle(color: AppColors.muted, fontSize: 13),
+            isTruthDisabled
+                ? '${_currentPlayer?.name}, you picked Truth last turn. DARE is required!'
+                : '${_currentPlayer?.name ?? "Player"}, truth or dare?',
+            style: TextStyle(
+              color: isTruthDisabled ? AppColors.neonRed : AppColors.muted,
+              fontSize: 13,
+              fontWeight: isTruthDisabled ? FontWeight.bold : FontWeight.normal,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 28),
           Row(
             children: [
+              // --- TRUTH BUTTON ---
               Expanded(
                 child: SizedBox(
                   height: 56,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.neonBlue.withOpacity(0.2),
-                      side: const BorderSide(color: AppColors.neonBlue, width: 1.5),
+                      backgroundColor: isTruthDisabled
+                          ? Colors.white10
+                          : AppColors.neonBlue.withOpacity(0.2),
+                      side: BorderSide(
+                        color: isTruthDisabled ? Colors.white24 : AppColors.neonBlue,
+                        width: 1.5,
+                      ),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    onPressed: () => _selectType('truth'),
-                    child: const Text(
-                      'TRUTH',
-                      style: TextStyle(color: AppColors.neonBlue, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                    onPressed: isTruthDisabled ? null : () => _selectType('truth'),
+                    child: Text(
+                      isTruthDisabled ? 'LOCKED 🔒' : 'TRUTH',
+                      style: TextStyle(
+                        color: isTruthDisabled ? AppColors.muted : AppColors.neonBlue,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 16),
+              // --- DARE BUTTON (Always Available) ---
               Expanded(
                 child: SizedBox(
                   height: 56,
@@ -620,7 +655,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     onPressed: () => _selectType('dare'),
                     child: const Text(
                       'DARE',
-                      style: TextStyle(color: AppColors.neonPink, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+                      style: TextStyle(
+                        color: AppColors.neonPink,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ),
                 ),
