@@ -165,7 +165,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _currentPlayer!.score = (_currentPlayer!.score + delta).clamp(0, 0x7fffffff);
       _currentPlayer!.hasCompletedTurn = true;
 
-      // If Shot Mode is enabled and challenge failed, trigger a penalty warning
+      // If Shot Mode is enabled and challenge failed, trigger penalty dialog
       if (!completed && _shotModeEnabled) {
         Future.delayed(const Duration(milliseconds: 300), () {
           if (!mounted) return;
@@ -551,10 +551,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         : AppColors.neonPink;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(_currentPlayer == null ? 'SPIN FOR YOUR FATE' : '${_currentPlayer!.name.toUpperCase()}\'S TURN'),
         actions: [
-          // Inject Custom Prompt Button
           IconButton(
             icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.neonPink),
             tooltip: 'Add Custom Prompt',
@@ -607,8 +607,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween, // Fills the screen vertically edge-to-edge
                       children: [
+                        // --- TOP STATUS SECTION ---
                         if (_currentPlayer != null)
                           Row(
                             children: [
@@ -644,80 +645,86 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                 ),
                               ),
                             ],
-                          ),
-                        const SizedBox(height: 20),
+                          )
+                        else
+                          const SizedBox(height: 8), // Spacer when no player selected yet
 
-                        ScaleTransition(
-                          scale: _scaleAnimation,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            transitionBuilder: (child, animation) => FadeTransition(
-                              opacity: animation,
-                              child: SlideTransition(
-                                position: Tween<Offset>(
-                                  begin: const Offset(0.0, 0.08),
-                                  end: Offset.zero,
-                                ).animate(animation),
-                                child: child,
+                        // --- CENTER SPINNER / CARD SECTION ---
+                        Center(
+                          child: ScaleTransition(
+                            scale: _scaleAnimation,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder: (child, animation) => FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0.0, 0.08),
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
                               ),
+                              child: !_isTurnStatusActive()
+                                  ? PlayerSpinner(
+                                      players: widget.players,
+                                      onPlayerSelected: _onPlayerSelected,
+                                    )
+                                  : (_currentQuestion == null
+                                      ? _buildChoiceSelectorCard()
+                                      : _buildChallengeCard()),
                             ),
-                            child: !_isTurnStatusActive()
-                                ? PlayerSpinner(
-                                    players: widget.players,
-                                    onPlayerSelected: _onPlayerSelected,
-                                  )
-                                : (_currentQuestion == null
-                                    ? _buildChoiceSelectorCard()
-                                    : _buildChallengeCard()),
                           ),
                         ),
 
-                        const SizedBox(height: 20),
-
-                        // Outcome Action Buttons (Completed vs Failed)
+                        // --- BOTTOM ACTION BUTTONS (COMPLETED / FAILED) ---
                         if (_currentQuestion != null)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: SizedBox(
-                                  height: 52,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.neonRed.withOpacity(0.2),
-                                      side: const BorderSide(color: AppColors.neonRed, width: 1.5),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                    ),
-                                    onPressed: () => _recordChallengeResult(false),
-                                    icon: const Icon(Icons.close_rounded, color: AppColors.neonRed),
-                                    label: const Text(
-                                      'FAILED (-5)',
-                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.neonRed),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: SizedBox(
-                                  height: 52,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.neonGreen.withOpacity(0.2),
-                                      side: const BorderSide(color: AppColors.neonGreen, width: 1.5),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                    ),
-                                    onPressed: () => _recordChallengeResult(true),
-                                    icon: const Icon(Icons.check_rounded, color: AppColors.neonGreen),
-                                    label: const Text(
-                                      'COMPLETED (+10)',
-                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.neonGreen),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 52,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.neonRed.withOpacity(0.2),
+                                        side: const BorderSide(color: AppColors.neonRed, width: 1.5),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                      ),
+                                      onPressed: () => _recordChallengeResult(false),
+                                      icon: const Icon(Icons.close_rounded, color: AppColors.neonRed),
+                                      label: const Text(
+                                        'FAILED (-5)',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.neonRed),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        const SizedBox(height: 12),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 52,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.neonGreen.withOpacity(0.2),
+                                        side: const BorderSide(color: AppColors.neonGreen, width: 1.5),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                      ),
+                                      onPressed: () => _recordChallengeResult(true),
+                                      icon: const Icon(Icons.check_rounded, color: AppColors.neonGreen),
+                                      label: const Text(
+                                        'COMPLETED (+10)',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.neonGreen),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          const SizedBox(height: 12),
                       ],
                     ),
                   ),
