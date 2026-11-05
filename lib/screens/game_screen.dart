@@ -312,6 +312,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       labelStyle: TextStyle(color: _currentThemeMode == 'Neon Cyberpunk' ? AppColors.neonPink : Colors.white),
                       onSelected: (selected) {
                         setModalState(() => _currentThemeMode = 'Neon Cyberpunk');
+                        AppColors.setThemeMode('Neon Cyberpunk');
                         setState(() {});
                       },
                     ),
@@ -325,6 +326,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       labelStyle: TextStyle(color: _currentThemeMode == 'Midnight Velvet' ? AppColors.neonBlue : Colors.white),
                       onSelected: (selected) {
                         setModalState(() => _currentThemeMode = 'Midnight Velvet');
+                        AppColors.setThemeMode('Midnight Velvet');
                         setState(() {});
                       },
                     ),
