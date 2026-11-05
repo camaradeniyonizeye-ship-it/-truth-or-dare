@@ -8,7 +8,8 @@ class AudioService with WidgetsBindingObserver {
   static final AudioPlayer _bgPlayer = AudioPlayer();
   static final AudioPlayer _sfxPlayer = AudioPlayer();
   static bool _isBgPlaying = false;
-  static bool _isEnabled = true;
+  static bool _musicEnabled = true;
+  static bool _sfxEnabled = true;
   static bool _initialized = false;
   static bool _winnerPlaying = false;
   static Timer? _winnerResumeTimer;
@@ -17,30 +18,42 @@ class AudioService with WidgetsBindingObserver {
   factory AudioService() => _instance;
   AudioService._internal();
 
-  static bool get isEnabled => _isEnabled;
+  static bool get musicEnabled => _musicEnabled;
+  static bool get sfxEnabled => _sfxEnabled;
 
   static void initialize() {
     if (_initialized) return;
     _initialized = true;
     WidgetsBinding.instance.addObserver(_instance);
     SharedPreferences.getInstance().then((preferences) {
-      _isEnabled = preferences.getBool('audio_enabled') ?? true;
-      if (_isEnabled && WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      _musicEnabled = preferences.getBool('music_enabled') ?? true;
+      _sfxEnabled = preferences.getBool('sfx_enabled') ?? true;
+      if (_musicEnabled && WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
         playBackground();
       }
     });
   }
 
-  static Future<void> setEnabled(bool enabled) async {
-    _isEnabled = enabled;
+  static Future<void> setMusicEnabled(bool enabled) async {
+    _musicEnabled = enabled;
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setBool('audio_enabled', enabled);
+    await preferences.setBool('music_enabled', enabled);
     if (!enabled) {
       _winnerResumeTimer?.cancel();
       _winnerPlaying = false;
-      await stopAll();
+      await _bgPlayer.stop();
+      _isBgPlaying = false;
     } else {
       await playBackground();
+    }
+  }
+
+  static Future<void> setSfxEnabled(bool enabled) async {
+    _sfxEnabled = enabled;
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('sfx_enabled', enabled);
+    if (!enabled) {
+      await _sfxPlayer.stop();
     }
   }
 
@@ -48,13 +61,13 @@ class AudioService with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
       stopAll();
-    } else if (state == AppLifecycleState.resumed && _isEnabled) {
+    } else if (state == AppLifecycleState.resumed && _musicEnabled) {
       playBackground();
     }
   }
 
   static Future<void> playBackground() async {
-    if (!_isEnabled || _isBgPlaying || _winnerPlaying) return;
+    if (!_musicEnabled || _isBgPlaying || _winnerPlaying) return;
     try {
       await _bgPlayer.setReleaseMode(ReleaseMode.loop);
       await _bgPlayer.setVolume(0.22);
@@ -66,7 +79,7 @@ class AudioService with WidgetsBindingObserver {
   }
 
   static Future<void> playClick() async {
-    if (!_isEnabled) return;
+    if (!_sfxEnabled) return;
     try {
       await _sfxPlayer.setVolume(.75);
       await _sfxPlayer.play(AssetSource('music/click.mp3'));
@@ -74,7 +87,7 @@ class AudioService with WidgetsBindingObserver {
   }
 
   static Future<void> playWheelSpin() async {
-    if (!_isEnabled) return;
+    if (!_sfxEnabled) return;
     try {
       await _sfxPlayer.setVolume(.75);
       await _sfxPlayer.play(AssetSource('music/card_flip.wav'));
@@ -82,7 +95,7 @@ class AudioService with WidgetsBindingObserver {
   }
 
   static Future<void> playCardFlip() async {
-    if (!_isEnabled) return;
+    if (!_sfxEnabled) return;
     try {
       await _sfxPlayer.setVolume(.75);
       await _sfxPlayer.play(AssetSource('music/card_flip.wav'));
@@ -90,17 +103,19 @@ class AudioService with WidgetsBindingObserver {
   }
 
   static Future<void> playWinner() async {
-    if (!_isEnabled) return;
+    if (!_sfxEnabled && !_musicEnabled) return;
     try {
       _winnerResumeTimer?.cancel();
       await _bgPlayer.stop();
       _isBgPlaying = false;
       _winnerPlaying = true;
-      await _sfxPlayer.setVolume(.85);
-      await _sfxPlayer.play(AssetSource('music/winner.wav'));
+      if (_sfxEnabled) {
+        await _sfxPlayer.setVolume(.85);
+        await _sfxPlayer.play(AssetSource('music/winner.wav'));
+      }
       _winnerResumeTimer = Timer(const Duration(seconds: 4), () {
         _winnerPlaying = false;
-        if (_isEnabled) playBackground();
+        if (_musicEnabled) playBackground();
       });
     } catch (_) {
       _winnerPlaying = false;
