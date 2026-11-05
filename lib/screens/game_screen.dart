@@ -31,10 +31,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   bool _isTurnActive = false;
 
   // Settings states
-  bool _soundEnabled = true;
-  bool _musicEnabled = true;
   String _currentThemeMode = 'Neon Cyberpunk';
-  int _dareDuration = 30; // 30s default (10s read, 20s action)
+  int _dareDuration = 30; // 30s default (15s read, 15s action)
 
   // Timer state variables
   Timer? _dareTimer;
@@ -82,13 +80,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         setState(() {
           _isTimerActive = false;
         });
-        if (_soundEnabled) AudioService.playClick();
+        if (AudioService.sfxEnabled) AudioService.playClick();
       }
     });
   }
 
   void _onPlayerSelected(Player selectedPlayer) {
-    if (_soundEnabled) AudioService.playClick();
+    if (AudioService.sfxEnabled) AudioService.playClick();
     setState(() {
       _currentPlayer = selectedPlayer;
       _isTurnActive = true;
@@ -100,7 +98,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _selectType(String type) {
-    if (_soundEnabled) AudioService.playClick();
+    if (AudioService.sfxEnabled) AudioService.playClick();
     _dareTimer?.cancel();
 
     final available = widget.questions.where((q) => q.type.toLowerCase() == type.toLowerCase()).toList();
@@ -139,7 +137,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _recordChallengeResult(bool completed) {
-    if (_soundEnabled) AudioService.playClick();
+    if (AudioService.sfxEnabled) AudioService.playClick();
     _dareTimer?.cancel();
 
     if (_currentPlayer != null) {
@@ -166,7 +164,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _showLeaderboard() {
-    if (_soundEnabled) AudioService.playClick();
+    if (AudioService.sfxEnabled) AudioService.playClick();
     final sortedPlayers = List<Player>.from(widget.players)
       ..sort((a, b) => b.score.compareTo(a.score));
 
@@ -246,7 +244,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _showSettings() {
-    if (_soundEnabled) AudioService.playClick();
+    if (AudioService.sfxEnabled) AudioService.playClick();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -282,20 +280,22 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               SwitchListTile(
                 title: const Text('Sound Effects (SFX)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 subtitle: const Text('Play clicks and completion alerts', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-                value: _soundEnabled,
+                value: AudioService.sfxEnabled,
                 activeColor: AppColors.neonPink,
-                onChanged: (val) {
-                  setModalState(() => _soundEnabled = val);
+                onChanged: (val) async {
+                  await AudioService.setSfxEnabled(val);
+                  setModalState(() {});
                   setState(() {});
                 },
               ),
               SwitchListTile(
                 title: const Text('Background Music', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 subtitle: const Text('Ambient atmospheric tunes', style: TextStyle(color: AppColors.muted, fontSize: 12)),
-                value: _musicEnabled,
+                value: AudioService.musicEnabled,
                 activeColor: AppColors.neonPink,
-                onChanged: (val) {
-                  setModalState(() => _musicEnabled = val);
+                onChanged: (val) async {
+                  await AudioService.setMusicEnabled(val);
+                  setModalState(() {});
                   setState(() {});
                 },
               ),
