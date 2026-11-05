@@ -2,12 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/player.dart';
 import '../models/question.dart';
-import '../models/game_rules.dart'; // Ensure you have your GameRules imported if separate
+import '../models/game_rules.dart';
 import '../utils/question_loader.dart';
 import '../services/audio_service.dart';
 import '../theme/app_background.dart';
 import '../theme/app_theme.dart';
 import '../widgets/player_spinner.dart';
+import '../widgets/ai_host_modal.dart';
 
 class GameScreen extends StatefulWidget {
   final List<Player> players;
@@ -29,7 +30,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   String _activeType = '';
   bool _isTurnActive = false;
 
-  // Timer state variables (30s total: 10s reading, 20s action)
+  // Settings states
+  bool _soundEnabled = true;
+  bool _musicEnabled = true;
+  String _currentThemeMode = 'Neon Cyberpunk';
+  int _dareDuration = 30; // 30s default (10s read, 20s action)
+
+  // Timer state variables
   Timer? _dareTimer;
   int _remainingSeconds = 30;
   bool _isTimerActive = false;
@@ -61,7 +68,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   void _startDareTimer() {
     _dareTimer?.cancel();
     setState(() {
-      _remainingSeconds = 30;
+      _remainingSeconds = _dareDuration;
       _isTimerActive = true;
     });
 
@@ -75,13 +82,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         setState(() {
           _isTimerActive = false;
         });
-        AudioService.playClick();
+        if (_soundEnabled) AudioService.playClick();
       }
     });
   }
 
   void _onPlayerSelected(Player selectedPlayer) {
-    AudioService.playClick();
+    if (_soundEnabled) AudioService.playClick();
     setState(() {
       _currentPlayer = selectedPlayer;
       _isTurnActive = true;
@@ -93,7 +100,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _selectType(String type) {
-    AudioService.playClick();
+    if (_soundEnabled) AudioService.playClick();
     _dareTimer?.cancel();
 
     final available = widget.questions.where((q) => q.type.toLowerCase() == type.toLowerCase()).toList();
@@ -132,17 +139,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _recordChallengeResult(bool completed) {
-    AudioService.playClick();
+    if (_soundEnabled) AudioService.playClick();
     _dareTimer?.cancel();
 
     if (_currentPlayer != null) {
-      // Apply scoring rules (+10 on completion, -5 on failure/skip)
       final delta = completed ? 10 : -5;
       _currentPlayer!.score = (_currentPlayer!.score + delta).clamp(0, 0x7fffffff);
       _currentPlayer!.hasCompletedTurn = true;
     }
 
-    // Check if round cycle is complete
     final allDone = widget.players.every((p) => p.hasCompletedTurn);
     if (allDone) {
       for (var p in widget.players) {
@@ -161,7 +166,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _showLeaderboard() {
-    AudioService.playClick();
+    if (_soundEnabled) AudioService.playClick();
     final sortedPlayers = List<Player>.from(widget.players)
       ..sort((a, b) => b.score.compareTo(a.score));
 
@@ -240,6 +245,141 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _showSettings() {
+    if (_soundEnabled) AudioService.playClick();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF140A1F),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: AppColors.neonPink.withOpacity(0.4), width: 1.5),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.settings_rounded, color: AppColors.neonPink),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'GAME SETTINGS',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: AppColors.muted),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SwitchListTile(
+                title: const Text('Sound Effects (SFX)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Play clicks and completion alerts', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                value: _soundEnabled,
+                activeColor: AppColors.neonPink,
+                onChanged: (val) {
+                  setModalState(() => _soundEnabled = val);
+                  setState(() {});
+                },
+              ),
+              SwitchListTile(
+                title: const Text('Background Music', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Ambient atmospheric tunes', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                value: _musicEnabled,
+                activeColor: AppColors.neonPink,
+                onChanged: (val) {
+                  setModalState(() => _musicEnabled = val);
+                  setState(() {});
+                },
+              ),
+              const Divider(color: Colors.white24, height: 24),
+              const Text('Theme Vibe', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Neon Cyberpunk'),
+                      selected: _currentThemeMode == 'Neon Cyberpunk',
+                      selectedColor: AppColors.neonPink.withOpacity(0.3),
+                      labelStyle: TextStyle(color: _currentThemeMode == 'Neon Cyberpunk' ? AppColors.neonPink : Colors.white),
+                      onSelected: (selected) {
+                        setModalState(() => _currentThemeMode = 'Neon Cyberpunk');
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Midnight Velvet'),
+                      selected: _currentThemeMode == 'Midnight Velvet',
+                      selectedColor: AppColors.neonBlue.withOpacity(0.3),
+                      labelStyle: TextStyle(color: _currentThemeMode == 'Midnight Velvet' ? AppColors.neonBlue : Colors.white),
+                      onSelected: (selected) {
+                        setModalState(() => _currentThemeMode = 'Midnight Velvet');
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Text('Dare Timer Duration', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('15s Quick'),
+                      selected: _dareDuration == 15,
+                      selectedColor: AppColors.neonPink.withOpacity(0.3),
+                      labelStyle: TextStyle(color: _dareDuration == 15 ? AppColors.neonPink : Colors.white),
+                      onSelected: (selected) {
+                        setModalState(() => _dareDuration = 15);
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('30s Standard'),
+                      selected: _dareDuration == 30,
+                      selectedColor: AppColors.neonPink.withOpacity(0.3),
+                      labelStyle: TextStyle(color: _dareDuration == 30 ? AppColors.neonPink : Colors.white),
+                      onSelected: (selected) {
+                        setModalState(() => _dareDuration = 30);
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.neonPink,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text('SAVE SETTINGS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final playerAccent = _currentPlayer != null && _currentPlayer!.gender.toLowerCase() == 'male' 
@@ -255,6 +395,26 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             tooltip: 'View Leaderboard',
             onPressed: _showLeaderboard,
           ),
+          IconButton(
+            icon: const Icon(Icons.auto_awesome_rounded, color: AppColors.neonPink),
+            tooltip: 'Ask AI Host',
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => AiHostModal(
+                  currentPlayer: _currentPlayer,
+                  allPlayers: widget.players,
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_rounded, color: AppColors.muted),
+            tooltip: 'Game Settings',
+            onPressed: _showSettings,
+          ),
         ],
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
@@ -266,122 +426,133 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       ),
       body: AppBackground(
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_currentPlayer != null)
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: playerAccent.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: playerAccent.withOpacity(0.4)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.person_rounded, size: 16, color: playerAccent),
-                            const SizedBox(width: 6),
-                            Text(
-                              _currentPlayer!.name,
-                              style: TextStyle(
-                                color: playerAccent,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (_currentPlayer != null)
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: playerAccent.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: playerAccent.withOpacity(0.4)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.person_rounded, size: 16, color: playerAccent),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _currentPlayer!.name,
+                                      style: TextStyle(
+                                        color: playerAccent,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                'Score: ${_currentPlayer!.score}',
+                                style: const TextStyle(
+                                  color: AppColors.muted,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: 20),
+
+                        ScaleTransition(
+                          scale: _scaleAnimation,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (child, animation) => FadeTransition(
+                              opacity: animation,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0.0, 0.08),
+                                  end: Offset.zero,
+                                ).animate(animation),
+                                child: child,
                               ),
                             ),
-                          ],
+                            child: !_isTurnStatusActive()
+                                ? PlayerSpinner(
+                                    players: widget.players,
+                                    onPlayerSelected: _onPlayerSelected,
+                                  )
+                                : (_currentQuestion == null
+                                    ? _buildChoiceSelectorCard()
+                                    : _buildChallengeCard()),
+                          ),
                         ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        'Score: ${_currentPlayer!.score}',
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                const Spacer(),
 
-                ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    transitionBuilder: (child, animation) => FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0.0, 0.08),
-                          end: Offset.zero,
-                        ).animate(animation),
-                        child: child,
-                      ),
+                        const SizedBox(height: 20),
+
+                        // Outcome Action Buttons (Completed vs Failed)
+                        if (_currentQuestion != null)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 52,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.neonRed.withOpacity(0.2),
+                                      side: const BorderSide(color: AppColors.neonRed, width: 1.5),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    ),
+                                    onPressed: () => _recordChallengeResult(false),
+                                    icon: const Icon(Icons.close_rounded, color: AppColors.neonRed),
+                                    label: const Text(
+                                      'FAILED (-5)',
+                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.neonRed),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 52,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.neonGreen.withOpacity(0.2),
+                                      side: const BorderSide(color: AppColors.neonGreen, width: 1.5),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                    ),
+                                    onPressed: () => _recordChallengeResult(true),
+                                    icon: const Icon(Icons.check_rounded, color: AppColors.neonGreen),
+                                    label: const Text(
+                                      'COMPLETED (+10)',
+                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.neonGreen),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: 12),
+                      ],
                     ),
-                    child: !_isTurnStatusActive()
-                        ? PlayerSpinner(
-                            players: widget.players,
-                            onPlayerSelected: _onPlayerSelected,
-                          )
-                        : (_currentQuestion == null
-                            ? _buildChoiceSelectorCard()
-                            : _buildChallengeCard()),
                   ),
                 ),
-
-                const Spacer(),
-
-                // Outcome Action Buttons (Completed vs Failed)
-                if (_currentQuestion != null)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 52,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.neonRed.withOpacity(0.2),
-                              side: const BorderSide(color: AppColors.neonRed, width: 1.5),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                            onPressed: () => _recordChallengeResult(false),
-                            icon: const Icon(Icons.close_rounded, color: AppColors.neonRed),
-                            label: const Text(
-                              'FAILED (-5)',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.neonRed),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: SizedBox(
-                          height: 52,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.neonGreen.withOpacity(0.2),
-                              side: const BorderSide(color: AppColors.neonGreen, width: 1.5),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                            onPressed: () => _recordChallengeResult(true),
-                            icon: const Icon(Icons.check_rounded, color: AppColors.neonGreen),
-                            label: const Text(
-                              'COMPLETED (+10)',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.neonGreen),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                const SizedBox(height: 12),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -465,8 +636,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     String timerStatusText = '';
     if (!isTruth && _isTimerActive) {
-      if (_remainingSeconds > 20) {
-        timerStatusText = '📖 READING & PREPARING (${_remainingSeconds - 20}s)';
+      if (_remainingSeconds > (_dareDuration / 2)) {
+        timerStatusText = '📖 READING & PREPARING (${_remainingSeconds - (_dareDuration ~/ 2)}s)';
       } else {
         timerStatusText = '⚡ ACTION TIME! (${_remainingSeconds}s remaining)';
       }
@@ -519,7 +690,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   width: 24,
                   height: 24,
                   child: CircularProgressIndicator(
-                    value: _remainingSeconds / 30.0,
+                    value: _remainingSeconds / _dareDuration.toDouble(),
                     strokeWidth: 3,
                     color: accentColor,
                     backgroundColor: Colors.white12,
