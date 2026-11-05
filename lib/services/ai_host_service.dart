@@ -9,7 +9,6 @@ class AiHostService {
     final lower = query.toLowerCase();
     final name = currentPlayer?.name ?? 'Player';
 
-    // Get other players for target references
     final others = allPlayers.where((p) => p.id != currentPlayer?.id).toList();
     final target1 = others.isNotEmpty ? others[_random.nextInt(others.length)].name : 'someone';
     final target2 = others.length > 1 ? others.where((p) => p.name != target1).toList()[_random.nextInt(others.length - 1)].name : target1;
@@ -38,7 +37,6 @@ class AiHostService {
       response = _generateGeneralCommentary(name, target1);
     }
 
-    // Ensure we don't repeat the exact same response consecutively
     while (_recentResponses.contains(response) && _recentResponses.length < 20) {
       if (lower.contains('roast') || lower.contains('judge')) {
         response = _generateRoast(name, target1);
@@ -72,7 +70,10 @@ class AiHostService {
       "belongs in a museum of awkward moments.",
       "had all the spice of lukewarm tap water.",
     ];
-    return "${subjects[_random.nextInt(subjects.length)]} ${_random.nextInt(100) + 1}% ${_random.choice(['definitely', 'totally', 'abysmally'])} ${verbs[_random.nextInt(verbs.length)]}";
+    final choices = ['definitely', 'totally', 'abysmally'];
+    final chosenWord = choices[_random.nextInt(choices.length)];
+
+    return "${subjects[_random.nextInt(subjects.length)]} ${_random.nextInt(100) + 1}% $chosenWord ${verbs[_random.nextInt(verbs.length)]}";
   }
 
   static String _generateCustomDare(String name, String target) {
@@ -105,8 +106,4 @@ class AiHostService {
     ];
     return comments[_random.nextInt(comments.length)];
   }
-}
-
-extension on List<String> {
-  String choice() => this[Random().nextInt(length)];
 }
