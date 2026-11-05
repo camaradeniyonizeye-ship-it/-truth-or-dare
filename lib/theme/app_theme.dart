@@ -1,27 +1,63 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const Color background = Color(0xFF09060D);
-  static const Color surface = Color(0xFF17111D);
-  static const Color surfaceRaised = Color(0xFF211727);
+  // --- Neon Cyberpunk Theme (Default) ---
+  static const Color cyberpunkBg = Color(0xFF09060D);
+  static const Color cyberpunkSurface = Color(0xFF17111D);
+  static const Color cyberpunkSurfaceRaised = Color(0xFF211727);
+  static const Color cyberpunkPink = Color(0xFFFF3978);
+  static const Color cyberpunkBlue = Color(0xFFB267FF);
+
+  // --- Midnight Velvet Theme ---
+  static const Color velvetBg = Color(0xFF060912);
+  static const Color velvetSurface = Color(0xFF111421);
+  static const Color velvetSurfaceRaised = Color(0xFF181D2E);
+  static const Color velvetPurple = Color(0xFF9C27B0);
+  static const Color velvetCyan = Color(0xFF00E5FF);
+
+  // --- Shared / Universal Colors ---
   static const Color neonRed = Color(0xFFFF3F62);
-  static const Color neonBlue = Color(0xFFB267FF);
-  static const Color neonPurple = Color(0xFFB267FF);
-  static const Color neonPink = Color(0xFFFF3978);
   static const Color neonGreen = Color(0xFF65E6B4);
   static const Color gold = Color(0xFFFFD477);
   static const Color white = Color(0xFFFFF7FC);
   static const Color muted = Color(0xFFB6A9B9);
   static const Color outline = Color(0xFF49334D);
+
+  // Active theme pointers (Defaults to Cyberpunk)
+  static Color background = cyberpunkBg;
+  static Color surface = cyberpunkSurface;
+  static Color surfaceRaised = cyberpunkSurfaceRaised;
+  static Color neonPink = cyberpunkPink;
+  static Color neonBlue = cyberpunkBlue;
+  static Color neonPurple = cyberpunkBlue;
+
+  /// Switch global accent colors based on user settings
+  static void setThemeMode(String themeName) {
+    if (themeName == 'Midnight Velvet') {
+      background = velvetBg;
+      surface = velvetSurface;
+      surfaceRaised = velvetSurfaceRaised;
+      neonPink = velvetPurple;
+      neonBlue = velvetCyan;
+      neonPurple = velvetPurple;
+    } else {
+      background = cyberpunkBg;
+      surface = cyberpunkSurface;
+      surfaceRaised = cyberpunkSurfaceRaised;
+      neonPink = cyberpunkPink;
+      neonBlue = cyberpunkBlue;
+      neonPurple = cyberpunkBlue;
+    }
+  }
 }
 
 class AppTheme {
   static ThemeData get theme => ThemeData(
         useMaterial3: true,
         colorScheme: const ColorScheme.dark(
-          primary: AppColors.neonPink,
-          secondary: AppColors.neonPurple,
-          surface: AppColors.surface,
+          primary: AppColors.cyberpunkPink,
+          secondary: AppColors.cyberpunkBlue,
+          surface: AppColors.cyberpunkSurface,
           error: AppColors.neonRed,
         ),
         scaffoldBackgroundColor: AppColors.background,
