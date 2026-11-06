@@ -25,34 +25,75 @@ jobs:
           flutter-version: '3.19.x'
           channel: 'stable'
 
+      # NEW: Cache Flutter dependencies for faster builds
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pub-cache
+            **/pubspec.lock
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
       - name: Re-generate Android platform files
         run: flutter create . --project-name truth_or_dare --platforms=android --org com.truthordare.app
 
+      # NEW: Ensure directory exists
+      - name: Create Android resources directory
+        run: mkdir -p android/app/src/main/res/values
+
       - name: Write App Name in strings.xml
         run: |
-          mkdir -p android/app/src/main/res/values
           cat << 'EOF' > android/app/src/main/res/values/strings.xml
           <resources>
               <string name="app_name">TRUTH OR DARE 18+</string>
           </resources>
           EOF
 
-      - name: Set compileSdkVersion to 34 in build.gradle
+      # ENHANCED: Set all SDK versions + multidex
+      - name: Configure build.gradle
         run: |
           sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' android/app/build.gradle
           sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/g' android/app/build.gradle
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/g' android/app/build.gradle
+          echo "multiDexEnabled true" >> android/app/build.gradle
 
       - name: Get Flutter Dependencies
         run: flutter pub get
 
       - name: Generate Custom Launcher Icon
-        run: flutter pub run flutter_launcher_icons
+        run: flutter pub run flutter_launcher_icons:main
 
-      - name: Build APK
-        run: flutter build apk --release --no-tree-shake-icons
+      # ENHANCED: Build with version info
+      - name: Build APK with Release Mode
+        run: |
+          flutter build apk \
+            --release \
+            --no-tree-shake-icons \
+            --build-name=1.1.2 \
+            --build-number=${{ github.run_number }}
 
+      # NEW: Rename APK with version info
+      - name: Rename APK with version
+        run: |
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          NEW_NAME="TRUTH_OR_DARE_18Plus_v1.1.2_${{ github.run_number }}.apk"
+          mv "$APK_PATH" "build/app/outputs/flutter-apk/$NEW_NAME"
+
+      # ENHANCED: Better artifact naming + retention
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: truth-or-dare-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: truth-or-dare-18plus-apk
+          path: build/app/outputs/flutter-apk/TRUTH_OR_DARE_18Plus_v1.1.2_${{ github.run_number }}.apk
+          retention-days: 30
+
+      # NEW: Display build info
+      - name: Display APK Info
+        run: |
+          echo "✅ APK Build Complete!"
+          echo "App Name: TRUTH OR DARE 18+"
+          echo "Version: 1.1.2"
+          echo "Build Number: ${{ github.run_number }}"
+          ls -lh build/app/outputs/flutter-apk/
