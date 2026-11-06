@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
@@ -19,6 +20,7 @@ class _SplashScreenState extends State<SplashScreen>
     vsync: this,
     duration: const Duration(milliseconds: 1100),
   )..forward();
+
   late final AnimationController _promptPulse = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1250),
@@ -26,8 +28,14 @@ class _SplashScreenState extends State<SplashScreen>
     upperBound: 1,
   )..repeat(reverse: true);
 
+  late final AnimationController _fadeIn = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 800),
+  );
+
   Timer? _navigationTimer;
   bool _isNavigating = false;
+  bool _imageLoaded = false;
 
   static const String _splashArtwork =
       'assets/images/Gemini_Generated_Image_jdf484jdf484jdf4.jfif';
@@ -35,7 +43,20 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+
+    // Hide system UI for immersive experience
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.immersiveSticky,
+      overlays: [],
+    );
+
+    // Start background music
     AudioService.playBackground();
+
+    // Start fade in animation
+    _fadeIn.forward();
+
+    // Set up navigation timer
     _navigationTimer = Timer(const Duration(milliseconds: 3600), _openApp);
   }
 
@@ -43,12 +64,20 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted || _isNavigating) return;
     _isNavigating = true;
     _navigationTimer?.cancel();
+
+    if (AudioService.sfxEnabled) {
+      AudioService.playClick();
+    }
+
     Navigator.of(context).pushReplacement<void, void>(
       PageRouteBuilder<void>(
         pageBuilder: (_, __, ___) => const LanguageSelectionScreen(),
         transitionDuration: const Duration(milliseconds: 500),
         transitionsBuilder: (_, animation, __, child) => FadeTransition(
-          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOut,
+          ),
           child: child,
         ),
       ),
@@ -60,21 +89,37 @@ class _SplashScreenState extends State<SplashScreen>
     _navigationTimer?.cancel();
     _entrance.dispose();
     _promptPulse.dispose();
+    _fadeIn.dispose();
+    
+    // Restore system UI
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.edgeToEdge,
+      overlays: SystemUiOverlay.values,
+    );
+    
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async => false, // Disable back button on splash
+      child: Scaffold(
         backgroundColor: AppColors.background,
         body: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: _openApp,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _openApp();
+          },
           child: LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth / constraints.maxHeight > 1.15;
+              
               return Stack(
                 fit: StackFit.expand,
                 children: [
+                  // Background Image with Animation
                   AnimatedBuilder(
                     animation: _entrance,
                     builder: (context, child) => Opacity(
@@ -88,19 +133,41 @@ class _SplashScreenState extends State<SplashScreen>
                       _splashArtwork,
                       fit: BoxFit.cover,
                       alignment: Alignment.center,
-                      errorBuilder: (context, error, stackTrace) => Image.asset(
-                        'assets/images/bg_splash.jpg',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const ColoredBox(
-                          color: AppColors.background,
-                          child: Center(
-                            child: Icon(Icons.local_fire_department_rounded,
-                                color: AppColors.neonPink, size: 74),
-                          ),
-                        ),
-                      ),
+                      errorBuilder: (context, error, stackTrace) {
+                        // Try fallback image
+                        return Image.asset(
+                          'assets/images/bg_splash.jpg',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) {
+                            // Final fallback
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              setState(() => _imageLoaded = true);
+                            });
+                            return const ColoredBox(
+                              color: AppColors.background,
+                              child: Center(
+                                child: Icon(
+                                  Icons.local_fire_department_rounded,
+                                  color: AppColors.neonPink,
+                                  size: 74,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                        if (wasSynchronouslyLoaded) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            setState(() => _imageLoaded = true);
+                          });
+                        }
+                        return child;
+                      },
                     ),
                   ),
+                  
+                  // Gradient Overlay
                   const IgnorePointer(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -117,71 +184,149 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ),
                   ),
+                  
+                  // Loading indicator (if image not loaded)
+                  if (!_imageLoaded)
+                    const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.neonPink,
+                      ),
+                    ),
+                  
+                  // Bottom Content
                   Positioned(
                     left: 18,
                     right: 18,
                     bottom: MediaQuery.paddingOf(context).bottom + (isWide ? 12 : 27),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 13, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: const Color(0xB309060D),
-                            borderRadius: BorderRadius.circular(30),
-                            border: Border.all(
-                                color: AppColors.neonPink.withOpacity(.4)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.neonPink.withOpacity(.12),
-                                blurRadius: 24,
+                    child: AnimatedOpacity(
+                      opacity: _imageLoaded ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 500),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 18+ Warning
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 500),
+                            curve: Curves.easeOut,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 13,
+                                vertical: 7,
                               ),
-                            ],
+                              decoration: BoxDecoration(
+                                color: const Color(0xB309060D),
+                                borderRadius: BorderRadius.circular(30),
+                                border: Border.all(
+                                  color: AppColors.neonPink.withOpacity(.4),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.neonPink.withOpacity(.12),
+                                    blurRadius: 24,
+                                  ),
+                                ],
+                              ),
+                              child: const Text(
+                                '18+  •  PLAY WITH RESPECT',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppColors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.8,
+                                ),
+                              ),
+                            ),
                           ),
-                          child: const Text(
-                            '18+  •  PLAY WITH RESPECT',
-                            textAlign: TextAlign.center,
+                          
+                          const SizedBox(height: 12),
+                          
+                          // Tap to Enter
+                          AnimatedBuilder(
+                            animation: _fadeIn,
+                            builder: (context, child) => Opacity(
+                              opacity: _fadeIn.value,
+                              child: child,
+                            ),
+                            child: ScaleTransition(
+                              scale: _promptPulse,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.touch_app_rounded,
+                                    size: 16,
+                                    color: AppColors.neonPink.withOpacity(.95),
+                                  ),
+                                  const SizedBox(width: 7),
+                                  const Text(
+                                    'TAP ANYWHERE TO ENTER',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 2,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black,
+                                          blurRadius: 10,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          
+                          // App Version (optional)
+                          const SizedBox(height: 8),
+                          const Text(
+                            'v1.0.0',
                             style: TextStyle(
-                              color: AppColors.white,
-                              fontSize: 9,
+                              color: AppColors.muted,
+                              fontSize: 8,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // App Logo/Title (optional)
+                  if (_imageLoaded)
+                    Positioned(
+                      top: MediaQuery.paddingOf(context).top + 40,
+                      left: 0,
+                      right: 0,
+                      child: AnimatedOpacity(
+                        opacity: _fadeIn.value,
+                        duration: const Duration(milliseconds: 800),
+                        child: const Center(
+                          child: Text(
+                            'A NIGHT TO REMEMBER',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
                               fontWeight: FontWeight.w900,
-                              letterSpacing: 1.8,
+                              letterSpacing: 2,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black,
+                                  blurRadius: 15,
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        ScaleTransition(
-                          scale: _promptPulse,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.touch_app_rounded,
-                                  size: 16,
-                                  color: AppColors.neonPink.withOpacity(.95)),
-                              const SizedBox(width: 7),
-                              const Text(
-                                'TAP ANYWHERE TO ENTER',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 2,
-                                  shadows: [
-                                    Shadow(color: Colors.black, blurRadius: 10),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
                 ],
               );
             },
           ),
         ),
-      );
+      ),
+    );
+  }
 }
